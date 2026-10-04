@@ -69,8 +69,8 @@ func panelReleaseAPI(repo string) string {
 // and compares it with the version this binary was built from.
 func (s *PanelService) GetUpdateInfo() (*PanelUpdateInfo, error) {
 	repo := config.GetPanelRepo()
-	if repo == "" || repo == config.PanelRepoDefault {
-		return nil, fmt.Errorf("panel repository is not configured; set SUI_PANEL_REPO or build with -X config.PanelRepo=owner/repo")
+	if !config.PanelRepoConfigured() {
+		return nil, fmt.Errorf("panel repository is not configured; run ./setrepo.sh owner/repo, or set SUI_PANEL_REPO, or build with -X config.PanelRepo=owner/repo")
 	}
 	latest, err := fetchLatestPanelVersion(repo)
 	if err != nil {
@@ -97,8 +97,8 @@ func (s *PanelService) StartUpdate() error {
 		return fmt.Errorf("panel web update is supported only on Linux installations")
 	}
 	repo := config.GetPanelRepo()
-	if repo == "" || repo == config.PanelRepoDefault {
-		return fmt.Errorf("panel repository is not configured; set SUI_PANEL_REPO or build with -X config.PanelRepo=owner/repo")
+	if !config.PanelRepoConfigured() {
+		return fmt.Errorf("panel repository is not configured; run ./setrepo.sh owner/repo, or set SUI_PANEL_REPO, or build with -X config.PanelRepo=owner/repo")
 	}
 
 	bash, err := exec.LookPath("bash")

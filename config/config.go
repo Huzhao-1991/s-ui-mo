@@ -28,9 +28,15 @@ func GetVersion() string {
 	return strings.TrimSpace(version)
 }
 
-// PanelRepoDefault is used when nothing overrides it. Release CI rewrites this
-// to the publishing repository via -ldflags -X, so a release build always knows
-// where to fetch its own updates from without a code change.
+// PanelRepoPlaceholder marks a checkout that was never pointed at a real
+// repository. setrepo.sh replaces every occurrence of it, so meeting this value
+// at runtime means the panel has no idea where its own releases live.
+const PanelRepoPlaceholder = "OWNER/REPO"
+
+// PanelRepoDefault is the repository this build publishes itself to. setrepo.sh
+// rewrites it to the fork you are releasing from, and release CI overrides it at
+// link time with -X, so a release build always knows where to fetch its own
+// updates from without a code change.
 const PanelRepoDefault = "Huzhao-1991/s-ui-mo"
 
 // PanelRepo is the GitHub "owner/repo" this build checks for updates and pulls
@@ -49,6 +55,17 @@ func GetPanelRepo() string {
 		return repo
 	}
 	return PanelRepoDefault
+}
+
+// PanelRepoConfigured reports whether the effective repository is a real one.
+//
+// The check must be against PanelRepoPlaceholder, never against
+// PanelRepoDefault: once setrepo.sh has run, the default *is* the real
+// repository, so comparing with it would report every properly configured
+// build as unconfigured and disable the panel's self-update.
+func PanelRepoConfigured() bool {
+	repo := GetPanelRepo()
+	return repo != "" && repo != PanelRepoPlaceholder
 }
 
 func GetName() string {
