@@ -1,0 +1,1694 @@
+diff -ruN
+--- a/src/layouts/default/Drawer.vue	2026-09-16 08:54:08.000000000 +0800
++++ b/src/layouts/default/Drawer.vue	2026-10-04 15:01:42.432336400 +0800
+@@ -11,6 +11,8 @@
+       height="63"
+       prepend-avatar="@/assets/logo.svg"
+       title="S-UI"
++      :subtitle="managedName"
++      :class="managedName ? 'text-warning' : undefined"
+     >
+       <template
+         v-if="isMobile"
+@@ -53,6 +55,7 @@
+ import { computed } from 'vue'
+ import router from '@/router'
+ import { logout } from '@/plugins/httputil'
++import Data from '@/store/modules/data'
+ 
+ const props = defineProps<{ isMobile: boolean, displayDrawer: boolean }>()
+ defineEmits<{ toggleDrawer: [] }>()
+@@ -61,13 +64,25 @@
+   return props.displayDrawer
+ })
+ 
++// Name of the panel the UI is currently driving, or '' when it is driving
++// itself. Shown under the logo because every page then edits that panel, and
++// nothing else on screen would say so.
++const managedName = computed((): string => {
++  const id = Data().currentServer
++  if (!id) return ''
++  return Data().servers.find(s => String(s.id) === id)?.name ?? id
++})
++
+ const menu = [
+   { title: 'pages.home', icon: 'mdi-home',  path: '/' },
+   { title: 'pages.inbounds', icon: 'mdi-cloud-download',  path: '/inbounds' },
++  // 中转管理：与参考魔改版一致，紧挨在入站管理后面
++  { title: 'pages.relay', icon: 'mdi-transit-connection-variant',  path: '/relay' },
+   { title: 'pages.clients', icon: 'mdi-account-multiple',  path: '/clients' },
+   { title: 'pages.outbounds', icon: 'mdi-cloud-upload',  path: '/outbounds' },
+   { title: 'pages.endpoints', icon: 'mdi-cloud-tags',  path: '/endpoints' },
+   { title: 'pages.services', icon: 'mdi-server',  path: '/services' },
++  { title: 'pages.servers', icon: 'mdi-server-network',  path: '/servers' },
+   { title: 'pages.tls', icon: 'mdi-certificate',  path: '/tls' },
+   { title: 'pages.basics', icon: 'mdi-application-cog',  path: '/basics' },
+   { title: 'pages.rules', icon: 'mdi-routes',  path: '/rules' },
+diff -ruN
+--- a/src/layouts/modals/ExportLinks.vue	1970-01-01 08:00:00.000000000 +0800
++++ b/src/layouts/modals/ExportLinks.vue	2026-10-04 15:03:11.897354200 +0800
+@@ -0,0 +1,197 @@
++<template>
++  <!-- ======================================================================
++    导出链接（ExportLinks）
++    --------------------------------------------------------------------
++    把面板里所有客户端的连接信息导出给外部客户端工具用，两个页签：
++      - 订阅：每个客户端一条订阅 URL（加一次自动更新，推荐）
++      - 全部链接：所有分享链接逐行排列，可明文或 Base64 整包复制，
++        直接粘进 v2rayN 的"从剪贴板导入批量URL"
++    数据来源：
++      - 订阅地址 = store 里的 subURI（面板订阅根路径）+ 客户端名
++      - 全部链接 = api/clients?id=1,2,3 一次性取回带 links 的完整行
++    ====================================================================== -->
++  <v-dialog transition="dialog-bottom-transition" width="760">
++    <v-card class="rounded-lg" id="export-links-modal" :loading="loading">
++      <v-card-title>
++        <v-row>
++          <v-col>{{ $t('exportLinks.title') }}</v-col>
++          <v-spacer />
++          <v-col cols="auto"><v-icon icon="mdi-close-box" @click="$emit('close')" /></v-col>
++        </v-row>
++      </v-card-title>
++      <v-divider />
++      <v-tabs v-model="tab" density="compact" fixed-tabs align-tabs="center">
++        <v-tab value="sub">{{ $t('exportLinks.subTab') }}</v-tab>
++        <v-tab value="links">{{ $t('exportLinks.linksTab') }}</v-tab>
++      </v-tabs>
++      <v-card-text>
++        <v-window v-model="tab" style="margin-top: 6px;">
++          <!-- 页签一：订阅 URL，一客户端一条，点二维码或输入框即复制 -->
++          <v-window-item value="sub">
++            <p style="font-size: 0.85rem; opacity: 0.8; margin-bottom: 12px;">{{ $t('exportLinks.subDesc') }}</p>
++            <div v-if="subList.length === 0" style="text-align: center; opacity: 0.6; padding: 20px;">{{ $t('exportLinks.empty') }}</div>
++            <v-card v-for="s in subList" :key="s.name" variant="outlined" class="rounded-lg" style="margin-bottom: 14px; padding: 12px;">
++              <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 10px;">
++                <v-chip size="small" color="primary">{{ s.name }}</v-chip>
++                <v-text-field
++                  :model-value="s.uri"
++                  readonly
++                  density="compact"
++                  hide-details
++                  variant="outlined"
++                  append-inner-icon="mdi-content-copy"
++                  @click:append-inner="copy(s.uri)"
++                  style="font-size: 0.76rem;"
++                />
++              </div>
++              <div style="text-align: center;">
++                <QrcodeVue :value="s.uri" :size="180" :margin="1" @click="copy(s.uri)" style="border-radius: 10px; cursor: copy;" />
++              </div>
++            </v-card>
++          </v-window-item>
++          <!-- 页签二：全部分享链接，支持明文 / Base64 整包 -->
++          <v-window-item value="links">
++            <p style="font-size: 0.85rem; opacity: 0.8; margin-bottom: 10px;">{{ $t('exportLinks.desc') }}</p>
++            <v-btn-toggle
++              v-model="format"
++              mandatory
++              density="compact"
++              variant="outlined"
++              color="primary"
++              style="margin-bottom: 10px;"
++            >
++              <v-btn value="plain" size="small">{{ $t('exportLinks.plain') }}</v-btn>
++              <v-btn value="base64" size="small">{{ $t('exportLinks.base64') }}</v-btn>
++            </v-btn-toggle>
++            <p v-if="format === 'base64'" style="font-size: 0.8rem; opacity: 0.7; margin-bottom: 8px;">{{ $t('exportLinks.base64Hint') }}</p>
++            <v-textarea
++              :model-value="displayText"
++              :rows="10"
++              readonly
++              variant="outlined"
++              hide-details
++              :placeholder="$t('exportLinks.empty')"
++              style="font-family: monospace; font-size: 0.78rem;"
++            />
++            <div style="text-align: end; margin-top: 10px;">
++              <span style="font-size: 0.8rem; opacity: 0.7; margin-inline-end: 10px;">{{ count }}</span>
++              <v-btn color="primary" variant="tonal" :disabled="!text" @click="copy(displayText)">{{ $t('exportLinks.copy') }}</v-btn>
++            </div>
++          </v-window-item>
++        </v-window>
++      </v-card-text>
++      <v-card-actions>
++        <v-spacer />
++        <v-btn color="primary" variant="outlined" @click="$emit('close')">{{ $t('actions.close') }}</v-btn>
++      </v-card-actions>
++    </v-card>
++  </v-dialog>
++</template>
++
++<script lang="ts">
++import QrcodeVue from 'qrcode.vue'
++import Data from '@/store/modules/data'
++import HttpUtils from '@/plugins/httputil'
++import Clipboard from 'clipboard'
++import { i18n } from '@/locales'
++import { push } from 'notivue'
++
++export default {
++  props: ['visible'],
++  emits: ['close'],
++  data() {
++    return {
++      loading: false,
++      tab: 'sub',        // 当前页签：sub（订阅）| links（全部链接）
++      text: '',          // 全部链接的原始文本（每行一条）
++      count: 0,          // 链接条数，展示在复制按钮旁
++      format: 'plain',   // 导出格式：plain 明文 | base64 整包
++      subList: <any[]>[], // 订阅列表 [{name, uri}]
++    }
++  },
++  watch: {
++    // 每次打开都重新拉数据，保证导出的是最新状态
++    visible(v: boolean) {
++      if (v) this.load()
++    },
++  },
++  computed: {
++    // base64 模式下做 UTF-8 安全编码：链接的 remark 里可能有中文，
++    // 直接 btoa() 会抛异常，必须先 encodeURIComponent
++    displayText(): string {
++      if (this.format === 'base64' && this.text) {
++        try {
++          return btoa(unescape(encodeURIComponent(this.text)))
++        } catch {
++          return this.text
++        }
++      }
++      return this.text
++    },
++  },
++  methods: {
++    async load() {
++      this.loading = true
++      this.tab = 'sub'
++      this.format = 'plain'
++      this.text = ''
++      this.count = 0
++
++      // 订阅 URL：一个客户端一条（覆盖它的全部协议，且自动更新）。
++      // subURI 来自面板设置（订阅根路径，形如 http://host:port/sub/）。
++      const subBase = Data().subURI
++      this.subList = Data().clients.map((c: any) => ({ name: c.name, uri: subBase + c.name }))
++
++      // 全部链接：一次请求取回完整客户端行（带 links 数组），
++      // 过滤掉 type === 'sub' 的项（那是订阅链接，不是分享链接）。
++      const ids = Data().clients.map((c: any) => c.id).filter((x: any) => x)
++      if (ids.length > 0) {
++        const msg = await HttpUtils.get<{ clients?: any[] }>('api/clients', { id: ids.join(',') })
++        if (msg.success && msg.obj?.clients) {
++          const uris: string[] = []
++          msg.obj.clients.forEach((c: any) => {
++            (c.links || []).forEach((l: any) => {
++              if (l.type !== 'sub' && l.uri) uris.push(l.uri)
++            })
++          })
++          this.text = uris.join('\n')
++          this.count = uris.length
++        }
++      }
++      this.loading = false
++    },
++    // 复制到剪贴板。clipboard 库要求从一个真实 DOM 元素上触发，
++    // 所以这里临时创建一个隐藏按钮，点击后立刻销毁。
++    copy(txt: string) {
++      if (!txt) return
++      const hiddenButton = document.createElement('button')
++      hiddenButton.className = 'export-clipboard-btn'
++      document.body.appendChild(hiddenButton)
++
++      const clipboard = new Clipboard('.export-clipboard-btn', {
++        text: () => txt,
++        container: document.getElementById('export-links-modal') ?? undefined,
++      })
++
++      clipboard.on('success', () => {
++        clipboard.destroy()
++        push.success({
++          message: i18n.global.t('success') + ': ' + i18n.global.t('copyToClipboard'),
++          duration: 3000,
++        })
++      })
++      clipboard.on('error', () => {
++        clipboard.destroy()
++        push.error({
++          message: i18n.global.t('failed') + ': ' + i18n.global.t('copyToClipboard'),
++          duration: 3000,
++        })
++      })
++
++      hiddenButton.click()
++      document.body.removeChild(hiddenButton)
++    },
++  },
++  components: { QrcodeVue },
++}
++</script>
+diff -ruN
+--- a/src/layouts/modals/RelayWizard.vue	1970-01-01 08:00:00.000000000 +0800
++++ b/src/layouts/modals/RelayWizard.vue	2026-10-04 15:03:11.912314100 +0800
+@@ -0,0 +1,212 @@
++<template>
++  <!-- ======================================================================
++    添加中转向导（RelayWizard）
++    --------------------------------------------------------------------
++    三步创建一个中转：
++      1. 解析「落地节点分享链接」 -> 得到一个 sing-box 出站对象
++         - socks5 链接在前端直接解析（socks5:// 或 IP:端口[:用户:密码]）
++         - 其它协议（vless/vmess/trojan/ss/hysteria2/tuic...）调后端
++           api/linkConvert 转换（与出站页「从链接导入」同一接口）
++      2. 起一个不冲突的 tag，把出站存进 outbounds
++      3. 往 config.route.rules 追加一条 {inbound: [...], action: route,
++         outbound: tag} 并保存（保存 config 会触发核心重启，出站与路由一起生效）
++      4. 最后调 api/checkOutbound 探测落地连通性，把结果反馈给用户
++    ====================================================================== -->
++  <v-dialog transition="dialog-bottom-transition" width="640">
++    <v-card class="rounded-lg" :loading="loading">
++      <v-card-title>{{ $t('relay.title') }}</v-card-title>
++      <v-divider />
++      <v-card-text>
++        <v-container style="padding: 0;">
++          <p style="font-size: 0.85rem; opacity: 0.8; margin-bottom: 12px;">{{ $t('relay.desc') }}</p>
++          <v-row>
++            <v-col cols="12">
++              <!-- 落地节点分享链接（vless://... 或 socks5 IP:端口:用户:密码） -->
++              <v-textarea
++                :label="$t('relay.link')"
++                :hint="$t('relay.linkHint')"
++                persistent-hint
++                v-model="form.link"
++                :rows="2"
++                auto-grow
++              />
++            </v-col>
++            <v-col cols="12" sm="6">
++              <!-- 中转名称：留空则自动生成 relay-xxxxxx -->
++              <v-text-field
++                :label="$t('relay.name')"
++                v-model="form.name"
++                hide-details
++              />
++            </v-col>
++            <v-col cols="12">
++              <!-- 入口入站：多选。只有选中的入站流量会走落地，
++                   未选中的保持直连（这是刻意设计，见 reset() 注释） -->
++              <v-select
++                :label="$t('relay.entry')"
++                :hint="$t('relay.entryHint')"
++                persistent-hint
++                :items="inboundOptions"
++                v-model="form.inbounds"
++                multiple
++                chips
++              />
++            </v-col>
++          </v-row>
++          <!-- 创建结果提示（成功/落地测试未通过） -->
++          <v-row v-if="result">
++            <v-col cols="12">
++              <v-alert :type="result.ok ? 'success' : 'warning'" density="compact" variant="tonal">
++                {{ result.text }}
++              </v-alert>
++            </v-col>
++          </v-row>
++        </v-container>
++      </v-card-text>
++      <v-card-actions>
++        <v-spacer />
++        <v-btn color="primary" variant="outlined" @click="closeModal">{{ $t('actions.close') }}</v-btn>
++        <v-btn color="primary" variant="tonal" :loading="loading" @click="createRelay">{{ $t('relay.create') }}</v-btn>
++      </v-card-actions>
++    </v-card>
++  </v-dialog>
++</template>
++
++<script lang="ts">
++import Data from '@/store/modules/data'
++import HttpUtils from '@/plugins/httputil'
++import RandomUtil from '@/plugins/randomUtil'
++import { i18n } from '@/locales'
++import { push } from 'notivue'
++
++export default {
++  props: ['visible'],
++  emits: ['close'],
++  data() {
++    return {
++      loading: false,
++      form: { link: '', name: '', inbounds: <string[]>[] },
++      result: <any>null,
++    }
++  },
++  watch: {
++    // 每次打开弹窗都重置表单，避免上一次的输入残留
++    visible(v: boolean) {
++      if (v) this.reset()
++    },
++  },
++  computed: {
++    // 可作为中转入口的入站 = 携带用户流量的入站（有 users 字段的）。
++    // 纯转发的入站（比如落地机上的）不该再被转出去。
++    inboundOptions(): string[] {
++      return (Data().inbounds || [])
++        .filter((i: any) => i.tag && i.users)
++        .map((i: any) => i.tag)
++    },
++  },
++  methods: {
++    reset() {
++      // 默认一个入口都不选。路由规则会把选中入站的出口整个改道到落地，
++      // 如果默认全选，会把现有所有节点一次性都推到落地 IP 后面
++      // （表现为"我原来的节点全变成中转的 IP 了"）。让用户自己挑。
++      this.form = { link: '', name: '', inbounds: [] }
++      this.result = null
++      this.loading = false
++    },
++    closeModal() {
++      this.$emit('close')
++    },
++    // -----------------------------------------------------------------
++    // 前端直接解析 SOCKS5 落地，省一次后端往返。
++    // 支持两种写法：
++    //   socks5://[user:pass@]host:port
++    //   IP:PORT 或 IP:PORT:USER:PASS（纯 IPv4）
++    // 解析不出返回 null，交给后端 linkConvert 兜底。
++    // -----------------------------------------------------------------
++    parseSocks(raw: string): any | null {
++      const uri = raw.match(/^socks5?:\/\/(?:([^:@/]+):([^@/]+)@)?\[?([^\]:/]+)\]?:(\d{1,5})\/?.*$/i)
++      if (uri) {
++        const ob: any = { type: 'socks', server: uri[3], server_port: parseInt(uri[4]), version: '5' }
++        if (uri[1]) { ob.username = decodeURIComponent(uri[1]); ob.password = decodeURIComponent(uri[2]) }
++        return ob
++      }
++      const parts = raw.split(':')
++      if ((parts.length === 2 || parts.length === 4) && /^(\d{1,3}\.){3}\d{1,3}$/.test(parts[0])) {
++        const port = parseInt(parts[1])
++        if (!Number.isInteger(port) || port < 1 || port > 65535) return null
++        const ob: any = { type: 'socks', server: parts[0], server_port: port, version: '5' }
++        if (parts.length === 4) { ob.username = parts[2]; ob.password = parts[3] }
++        return ob
++      }
++      return null
++    },
++    async createRelay() {
++      const link = (this.form.link || '').trim()
++      if (!link) {
++        push.error({ message: i18n.global.t('error.invalidData') + ': ' + i18n.global.t('relay.link') })
++        return
++      }
++      if (this.form.inbounds.length === 0) {
++        push.error({ message: i18n.global.t('error.invalidData') + ': ' + i18n.global.t('relay.entry') })
++        return
++      }
++      this.loading = true
++      this.result = null
++      try {
++        // 1) 构造落地出站。SOCKS5 在前端解析；其它协议走后端分享链接转换。
++        let outbound: any = this.parseSocks(link)
++        if (!outbound) {
++          const conv = await HttpUtils.post<{ type?: string; tag?: string }>('api/linkConvert', { link })
++          if (!conv.success || !conv.obj || !conv.obj.type) {
++            push.error({ message: i18n.global.t('relay.convertFail') })
++            return
++          }
++          outbound = conv.obj
++        }
++
++        // 2) 选一个不与现有出站/端点/入站冲突的 tag。
++        //    优先用用户填的名称，其次用转换结果自带的 tag，最后随机生成。
++        const base = (this.form.name || '').trim() || outbound.tag || ('relay-' + RandomUtil.randomLowerAndNum(6))
++        const used = new Set<string>([
++          ...(Data().outbounds || []).map((o: any) => o.tag),
++          ...(Data().endpoints || []).map((e: any) => e.tag),
++          ...(Data().inbounds || []).map((i: any) => i.tag),
++        ])
++        let tag = base
++        let n = 1
++        while (used.has(tag)) tag = base + '-' + (n++)
++        outbound.tag = tag
++        // id 是后端数据库字段，新建时不能带过去
++        delete outbound.id
++
++        // 3) 保存落地出站。
++        if (!await Data().save('outbounds', 'new', outbound)) return
++
++        // 4) 追加路由规则：入口入站 -> 该落地出站。
++        const config = JSON.parse(JSON.stringify(Data().config || {}))
++        if (!config.route) config.route = {}
++        if (!Array.isArray(config.route.rules)) config.route.rules = []
++        config.route.rules.push({ inbound: [...this.form.inbounds], action: 'route', outbound: tag })
++
++        // 5) 保存完整 config（触发核心重启，出站与路由同时生效）。
++        if (!await Data().save('config', 'set', config)) return
++
++        // 6) 探测落地连通性，把结果展示在弹窗里。
++        const test = await HttpUtils.get<{ OK: boolean; Delay?: number; Error?: string }>('api/checkOutbound', { tag })
++        if (test.success && test.obj?.OK) {
++          this.result = { ok: true, text: i18n.global.t('relay.testOk') + ': ' + test.obj.Delay + i18n.global.t('date.ms') }
++          push.success({ title: i18n.global.t('success'), message: i18n.global.t('relay.success') })
++        } else {
++          this.result = { ok: false, text: i18n.global.t('relay.testFail') + ': ' + (test.obj?.Error || '') }
++          push.success({ title: i18n.global.t('success'), message: i18n.global.t('relay.successButTest') })
++        }
++        this.form.link = ''
++      } catch (e: any) {
++        push.error({ message: i18n.global.t('error.invalidData') + ': ' + (e?.toString() ?? '') })
++      } finally {
++        this.loading = false
++      }
++    },
++  },
++}
++</script>
+diff -ruN
+--- a/src/layouts/modals/Server.vue	1970-01-01 08:00:00.000000000 +0800
++++ b/src/layouts/modals/Server.vue	2026-10-04 11:06:11.352648500 +0800
+@@ -0,0 +1,136 @@
++<template>
++  <v-dialog
++    :model-value="visible"
++    transition="dialog-bottom-transition"
++    width="560"
++    @update:model-value="(v: boolean) => { if (!v) $emit('close') }"
++  >
++    <v-card
++      class="rounded-lg"
++      :loading="loading"
++    >
++      <v-card-title>
++        <v-row>
++          <v-col>{{ $t('actions.' + (form.id ? 'edit' : 'add')) + ' ' + $t('objects.server') }}</v-col>
++          <v-spacer />
++          <v-col cols="auto">
++            <v-icon
++              icon="mdi-close-box"
++              @click="$emit('close')"
++            />
++          </v-col>
++        </v-row>
++      </v-card-title>
++      <v-divider />
++      <v-card-text>
++        <v-text-field
++          v-model="form.name"
++          :label="$t('server.name')"
++          hide-details
++          class="mb-4"
++        />
++        <v-text-field
++          v-model="form.url"
++          :label="$t('server.url')"
++          :hint="$t('server.urlHint')"
++          persistent-hint
++          placeholder="http://1.2.3.4:2095/app/"
++          class="mb-4"
++        />
++        <v-text-field
++          v-model="form.token"
++          :label="$t('server.token')"
++          :hint="$t('server.tokenHint')"
++          persistent-hint
++          :type="showPass ? 'text' : 'password'"
++          :append-inner-icon="showPass ? 'mdi-eye-off' : 'mdi-eye'"
++          class="mb-4"
++          @click:append-inner="showPass = !showPass"
++        />
++        <v-text-field
++          v-model="form.remark"
++          :label="$t('server.remark')"
++          hide-details
++        />
++      </v-card-text>
++      <v-divider />
++      <v-card-actions>
++        <v-spacer />
++        <v-btn
++          color="primary"
++          variant="outlined"
++          @click="$emit('close')"
++        >
++          {{ $t('actions.close') }}
++        </v-btn>
++        <v-btn
++          color="primary"
++          variant="tonal"
++          :loading="loading"
++          @click="save"
++        >
++          {{ $t('actions.save') }}
++        </v-btn>
++      </v-card-actions>
++    </v-card>
++  </v-dialog>
++</template>
++
++<script lang="ts" setup>
++import Data from '@/store/modules/data'
++import { i18n } from '@/locales'
++import { push } from 'notivue'
++import { ref, watch } from 'vue'
++import type { Server } from '@/types/servers'
++
++const props = defineProps<{
++  visible: boolean
++  server: Server | null
++}>()
++
++const emit = defineEmits<{ close: [] }>()
++
++const loading = ref(false)
++const showPass = ref(false)
++const form = ref<Server>({ id: 0, name: '', url: '', token: '', remark: '' })
++
++watch(() => props.visible, (v: boolean) => {
++  if (!v) return
++  const s = props.server
++  form.value = s
++    ? { id: s.id, name: s.name, url: s.url, token: s.token ?? '', remark: s.remark ?? '' }
++    : { id: 0, name: '', url: '', token: '', remark: '' }
++  showPass.value = false
++  loading.value = false
++})
++
++// A bare host is far easier to type than a full origin, and the backend
++// normalises either form, so only the scheme is filled in here.
++function normalizeUrl(u: string): string {
++  u = (u || '').trim()
++  if (u && !/^https?:\/\//i.test(u)) u = 'http://' + u
++  return u
++}
++
++async function save() {
++  const name = (form.value.name || '').trim()
++  const url = normalizeUrl(form.value.url)
++  if (!name || !url) {
++    push.error({
++      message: i18n.global.t('error.invalidData') + ': ' + i18n.global.t('server.url'),
++    })
++    return
++  }
++  loading.value = true
++  const payload: Server = {
++    name,
++    url,
++    token: (form.value.token || '').trim(),
++    remark: (form.value.remark || '').trim(),
++  }
++  if (form.value.id) payload.id = form.value.id
++  const success = await Data().save('servers', form.value.id ? 'edit' : 'new', payload)
++  loading.value = false
++  if (success) emit('close')
++}
++</script>
+diff -ruN
+--- a/src/locales/en.ts	2026-09-16 08:54:08.000000000 +0800
++++ b/src/locales/en.ts	2026-10-04 15:02:16.880822600 +0800
+@@ -42,8 +42,10 @@
+     login: "Login",
+     home: "Home",
+     inbounds: "Inbounds",
++    relay: "Relay",
+     outbounds: "Outbounds",
+     services: "Services",
++    servers: "Servers",
+     endpoints: "Endpoints",
+     clients: "Clients",
+     rules: "Rules",
+@@ -53,6 +55,41 @@
+     admins: "Admins",
+     settings: "Settings",
+   },
++  // Relay management: forward an inbound's traffic out through a landing node
++  relay: {
++    btn: "Add Relay",
++    title: "Add Relay (Transit)",
++    desc: "Forward an inbound's traffic out through a landing node. Paste the landing node's share link and choose which inbounds relay through it.",
++    link: "Landing node share link",
++    linkHint: "vless:// vmess:// trojan:// ss:// hysteria2:// tuic:// ... or SOCKS5  IP:PORT:USER:PASS",
++    name: "Relay name (optional)",
++    entry: "Entry inbound(s)",
++    entryHint: "Only the selected inbound(s) route through this landing; unselected nodes stay direct.",
++    create: "Create Relay",
++    convertFail: "Could not parse the share link",
++    success: "Relay created",
++    successButTest: "Relay created, but the landing test did not pass — check the link or re-test on the Outbounds page",
++    testOk: "Landing OK",
++    testFail: "Landing test failed",
++    empty: "No relays yet. Click \"Add Relay\" to create one.",
++    delConfirm: "Delete this relay (its route rule and the landing outbound)?",
++    clearAll: "Delete All",
++    clearAllConfirm: "Delete ALL relays (route rules + landing outbounds)? This cannot be undone.",
++  },
++  // Export links: bulk-export client subscriptions / share links
++  exportLinks: {
++    btn: "Export",
++    title: "Export Links",
++    desc: "All client share links, one per line. In v2rayN: Servers → Import bulk URL from clipboard (Ctrl+V).",
++    copy: "Copy All",
++    empty: "No links to export",
++    plain: "Plain",
++    base64: "Base64",
++    base64Hint: "Base64 (subscription content format) — for tools that import a single encoded blob.",
++    subTab: "Subscription",
++    linksTab: "All Links",
++    subDesc: "Add one subscription URL to your client (v2rayN / Shadowrocket) — it pulls every protocol of that client and auto-updates.",
++  },
+   main: {
+     tiles: "Tiles",
+     gauges: "Gauges",
+@@ -105,6 +142,7 @@
+     rule: "Rule",
+     ruleset: "Ruleset",
+     service: "Service",
++    server: "Server",
+     dnsserver: "DNS Server",
+     dnsrule: "DNS Rule",
+     user: "User",
+@@ -144,6 +182,29 @@
+     startCore: "Start Core",
+     restartSb: "Restart Singbox",
+     closeSessions: "Disconnect User",
++    updatePanel: "Update Panel",
++    updateConfirm: "Update the panel now? It will reinstall and restart.",
++    updateStarted: "Panel update started",
++  },
++  server: {
++    add: "Add server",
++    name: "Name",
++    url: "Panel URL",
++    urlHint: "Address of the remote panel. Include its path (e.g. http://1.2.3.4:2095/app/); a bare host also works, in which case the default /app/ is retried.",
++    token: "API token",
++    tokenHint: "APIv2 token of the remote panel (run `s-ui token` on that machine). Leave empty to keep this entry a plain bookmark.",
++    remark: "Remark",
++    test: "Test",
++    testing: "Testing",
++    untested: "Not tested",
++    online: "Online",
++    offline: "Offline",
++    manage: "Manage this panel",
++    managing: "Currently managing",
++    managingHint: "This UI is managing \"{name}\". Every page you open edits that panel.",
++    backToLocal: "Back to this panel",
++    empty: "No servers saved yet.",
++    wipeNodes: "Also delete every inbound on this server (cannot be undone)",
+   },
+   login: {
+     title: "Login",
+diff -ruN
+--- a/src/locales/zhcn.ts	2026-09-16 08:54:08.000000000 +0800
++++ b/src/locales/zhcn.ts	2026-10-04 15:02:02.826679000 +0800
+@@ -42,8 +42,10 @@
+     login: "登录",
+     home: "主页",
+     inbounds: "入站管理",
++    relay: "中转管理",
+     outbounds: "出站管理",
+     services: "服务管理",
++    servers: "服务器",
+     endpoints: "节点管理",
+     clients: "用户管理",
+     rules: "路由列表",
+@@ -53,6 +55,41 @@
+     admins: "管理员",
+     settings: "设置",
+   },
++  // 中转管理：把入口入站的流量经落地节点转发出去
++  relay: {
++    btn: "添加中转",
++    title: "添加中转",
++    desc: "把某个入站的流量,经落地节点转发出去。粘贴落地节点的分享链接,再选哪些入站走这个中转。",
++    link: "落地节点分享链接",
++    linkHint: "vless:// vmess:// trojan:// ss:// hysteria2:// tuic:// … 或 socks5  IP:端口:用户:密码",
++    name: "中转名称(可选)",
++    entry: "入口入站",
++    entryHint: "只有选中的入站(节点)会经此落地转发;未选中的保持原样直连。",
++    create: "创建中转",
++    convertFail: "无法解析分享链接",
++    success: "中转已创建",
++    successButTest: "中转已创建,但落地测试未通过——请检查链接,或到出站页重测",
++    testOk: "落地连通",
++    testFail: "落地测试失败",
++    empty: "还没有中转。点「添加中转」创建一个。",
++    delConfirm: "删除该中转(它的路由规则 + 落地出站)?",
++    clearAll: "全部删除",
++    clearAllConfirm: "删除全部中转(路由规则 + 落地出站)?此操作不可撤销。",
++  },
++  // 导出链接：把客户端的订阅地址 / 分享链接批量导出给外部工具
++  exportLinks: {
++    btn: "导出",
++    title: "导出链接",
++    desc: "所有客户端的分享链接,每行一条。v2rayN:服务器 → 从剪贴板导入批量URL(Ctrl+V)。",
++    copy: "复制全部",
++    empty: "没有可导出的链接",
++    plain: "明文",
++    base64: "Base64",
++    base64Hint: "Base64(订阅内容格式)——给只认整包编码的工具用。",
++    subTab: "订阅",
++    linksTab: "全部链接",
++    subDesc: "把订阅链接添加到客户端(v2rayN / 小火箭)一次,它会拉取该客户端的全部协议并自动更新。",
++  },
+   main: {
+     tiles: "信息卡",
+     gauges: "仪表板",
+@@ -105,6 +142,7 @@
+     rule: "规则",
+     ruleset: "规则集",
+     service: "服务",
++    server: "服务器",
+     dnsserver: "DNS 服务器",
+     dnsrule: "DNS规则",
+     user: "用户",
+@@ -144,6 +182,29 @@
+     startCore: "启动内核",
+     restartSb: "重启 Singbox",
+     closeSessions: "断开该用户",
++    updatePanel: "更新面板",
++    updateConfirm: "现在更新面板？面板会重新安装并重启。",
++    updateStarted: "已开始更新面板",
++  },
++  server: {
++    add: "添加服务器",
++    name: "名称",
++    url: "面板地址",
++    urlHint: "远程面板地址，建议带上路径（例如 http://1.2.3.4:2095/app/）。省略路径也可以，会按默认的 /app/ 再试一次。",
++    token: "API 令牌",
++    tokenHint: "远程面板的 APIv2 令牌（在该机器上执行 s-ui token 获取）。留空则此条目只作书签。",
++    remark: "备注",
++    test: "测试",
++    testing: "测试中",
++    untested: "未测试",
++    online: "在线",
++    offline: "离线",
++    manage: "管理该面板",
++    managing: "正在管理中",
++    managingHint: "当前正在管理「{name}」，你打开的每个页面都会编辑该面板。",
++    backToLocal: "返回本机面板",
++    empty: "还没有保存任何服务器。",
++    wipeNodes: "同时删除该服务器上的全部入站（不可撤销）",
+   },
+   login: {
+     title: "登录",
+diff -ruN
+--- a/src/locales/zhtw.ts	2026-09-16 08:54:08.000000000 +0800
++++ b/src/locales/zhtw.ts	2026-10-04 13:07:16.094559700 +0800
+@@ -44,6 +44,7 @@
+     inbounds: "入站管理",
+     outbounds: "出站管理",
+     services: "服務管理",
++    servers: "伺服器",
+     endpoints: "端點管理",
+     clients: "用戶管理",
+     rules: "路由列表",
+@@ -105,6 +106,7 @@
+     rule: "規則",
+     ruleset: "規則集",
+     service: "服務",
++    server: "伺服器",
+     dnsserver: "DNS 服務器",
+     dnsrule: "DNS 規則",
+     user: "用戶",
+@@ -144,6 +146,29 @@
+     startCore: "啟動核心",
+     restartSb: "重啟 Singbox",
+     closeSessions: "斷開該使用者",
++    updatePanel: "更新面板",
++    updateConfirm: "現在更新面板？面板會重新安裝並重啟。",
++    updateStarted: "已開始更新面板",
++  },
++  server: {
++    add: "新增伺服器",
++    name: "名稱",
++    url: "面板位址",
++    urlHint: "遠端面板位址，建議帶上路徑（例如 http://1.2.3.4:2095/app/）。省略路徑亦可，會改以預設的 /app/ 重試。",
++    token: "API 權杖",
++    tokenHint: "遠端面板的 APIv2 權杖（在該機器上執行 s-ui token 取得）。留空則此項目僅作為書籤。",
++    remark: "備註",
++    test: "測試",
++    testing: "測試中",
++    untested: "未測試",
++    online: "線上",
++    offline: "離線",
++    manage: "管理該面板",
++    managing: "正在管理中",
++    managingHint: "目前正在管理「{name}」，你開啟的每個頁面都會編輯該面板。",
++    backToLocal: "返回本機面板",
++    empty: "尚未儲存任何伺服器。",
++    wipeNodes: "同時刪除該伺服器上的全部入站（無法復原）",
+   },
+   login: {
+     title: "登錄",
+diff -ruN
+--- a/src/plugins/api.ts	2026-09-16 08:54:08.000000000 +0800
++++ b/src/plugins/api.ts	2026-10-04 11:46:46.939560800 +0800
+@@ -1,5 +1,6 @@
+ import axios from 'axios'
+ import type { CancelTokenSource } from 'axios'
++import { getRemoteServer } from './remote'
+ 
+ // Everything below is configured on the instance this module exports. It used
+ // to be set on the global axios default and the exported instance was created
+@@ -56,6 +57,17 @@
+         if (config.data instanceof FormData) {
+             config.headers['Content-Type'] = 'multipart/form-data'
+         }
++        // Central-management proxy. When a remote panel is selected every call
++        // is forwarded by the backend to that instance's APIv2, so the whole UI
++        // drives the remote with the local session intact. Attached here, on
++        // the instance, so no call site can forget it.
++        // A caller may name its own target explicitly (that is how the
++        // launcher cleans up a server that is not the selected one), so an
++        // already-present header wins over the global selection.
++        const remote = getRemoteServer()
++        if (remote && !config.headers['X-Remote-Server']) {
++            config.headers['X-Remote-Server'] = remote
++        }
+         return config
+     },
+     (error) => Promise.reject(error),
+diff -ruN
+--- a/src/plugins/remote.ts	1970-01-01 08:00:00.000000000 +0800
++++ b/src/plugins/remote.ts	2026-10-04 11:06:11.131620300 +0800
+@@ -0,0 +1,26 @@
++// Which panel the UI is currently driving. Empty means "the one that served
++// this page".
++//
++// This lives in its own module rather than in httputil so that api.ts can read
++// it: httputil imports api, so api importing httputil back would close the
++// cycle. api.ts attaches the header, everyone else reads and sets the value.
++const STORAGE_KEY = 'remoteServer'
++
++// Read once at module load. The selection is a property of the browser, not of
++// the session, so it survives a reload -- otherwise refreshing the page while
++// managing a remote would silently drop you back onto the local panel with no
++// visible sign that the switch happened.
++let current = localStorage.getItem(STORAGE_KEY) ?? ''
++
++export function setRemoteServer(id: string | number | null): void {
++  current = id ? String(id) : ''
++  if (current) {
++    localStorage.setItem(STORAGE_KEY, current)
++  } else {
++    localStorage.removeItem(STORAGE_KEY)
++  }
++}
++
++export function getRemoteServer(): string {
++  return current
++}
+diff -ruN
+--- a/src/router/index.ts	2026-09-16 08:54:08.000000000 +0800
++++ b/src/router/index.ts	2026-10-04 15:01:42.415364300 +0800
+@@ -26,6 +26,13 @@
+         component: () => import('@/views/Inbounds.vue'),
+       },
+       {
++        // 中转管理：把入口入站的流量经落地节点转发出去。
++        // 纯前端页面，数据全部来自 config.route.rules + outbounds。
++        path: '/relay',
++        name: 'pages.relay',
++        component: () => import('@/views/Relay.vue'),
++      },
++      {
+         path: '/clients',
+         name: 'pages.clients',
+         component: () => import('@/views/Clients.vue'),
+@@ -41,6 +48,11 @@
+         component: () => import('@/views/Services.vue'),
+       },
+       {
++        path: '/servers',
++        name: 'pages.servers',
++        component: () => import('@/views/Servers.vue'),
++      },
++      {
+         path: '/endpoints',
+         name: 'pages.endpoints',
+         component: () => import('@/views/Endpoints.vue'),
+@@ -114,6 +126,10 @@
+ const loadDataInterval = () => {
+   if (intervalId) return
+   Data().loadData()
++  // Fetched once rather than on the poll: api/servers is answered locally, and
++  // the launcher list cannot change behind our back the way inbound or client
++  // state can.
++  Data().loadServers()
+   intervalId = setInterval(() => {
+     Data().loadData()
+   }, 10000)
+diff -ruN
+--- a/src/store/modules/data.ts	2026-09-16 08:54:08.000000000 +0800
++++ b/src/store/modules/data.ts	2026-10-04 11:06:59.776199300 +0800
+@@ -9,6 +9,8 @@
+ import { Endpoint } from '@/types/endpoints'
+ import { Config } from '@/types/config'
+ import { tls } from '@/types/tls'
++import { Server } from '@/types/servers'
++import { getRemoteServer, setRemoteServer } from '@/plugins/remote'
+ 
+ // Online tags, by kind. The backend marks each list `omitempty`, so a poll
+ // with nobody online answers with {} rather than three empty lists. Every
+@@ -37,6 +39,10 @@
+   services?: Srv[]
+   endpoints?: Endpoint[]
+   tls?: tls[]
++  // The launcher list. Only ever arrives from api/servers, never from the
++  // api/load poll: api/load is proxied to whichever panel is being managed and
++  // the list of panels is a property of this one.
++  servers?: Server[]
+ }
+ 
+ // The duplicate-tag check works on any of the four lists without caring which
+@@ -61,6 +67,10 @@
+     endpoints: <Endpoint[]>[],
+     clients: <Client[]>[],
+     tlsConfigs: <tls[]>[],
++    // Saved panel addresses, and which of them this UI is driving right now
++    // ('' means this panel). Read back from storage so a reload keeps it.
++    servers: <Server[]>[],
++    currentServer: getRemoteServer(),
+   }),
+   actions: {
+     async loadData() {
+@@ -96,6 +106,26 @@
+       if (Object.hasOwn(data, 'services')) this.services = data.services ?? []
+       if (Object.hasOwn(data, 'endpoints')) this.endpoints = data.endpoints ?? []
+       if (Object.hasOwn(data, 'tls')) this.tlsConfigs = data.tls ?? []
++      if (Object.hasOwn(data, 'servers')) this.servers = data.servers ?? []
++    },
++    async loadServers() {
++      const msg = await HttpUtils.get<{ servers: Server[] }>('api/servers')
++      if (msg.success) this.servers = msg.obj.servers ?? []
++    },
++    // Point the whole UI at another panel. '' means this one.
++    setCurrentServer(id: string | number | null) {
++      const value = id ? String(id) : ''
++      this.currentServer = value
++      setRemoteServer(value)
++    },
++    // Switch panels and pull the new one's full state. lastLoad is cleared
++    // first: that timestamp only means anything to the panel that issued it, so
++    // replaying it against a different instance asks "what changed since <some
++    // other machine's clock>" and comes back with an empty delta.
++    async switchServer(id: string | number | null) {
++      this.setCurrentServer(id)
++      this.lastLoad = 0
++      await this.loadData()
+     },
+     async loadInbounds(ids: number[]): Promise<Inbound[]> {
+       const options = ids.length > 0 ? {id: ids.join(",")} : {}
+diff -ruN
+--- a/src/types/servers.ts	1970-01-01 08:00:00.000000000 +0800
++++ b/src/types/servers.ts	2026-10-04 11:06:10.921318700 +0800
+@@ -0,0 +1,10 @@
++// A saved panel address — one row of the launcher, mirroring
++// database/model/server.go. Two uses share the shape: with an empty token the
++// entry is just a bookmark, with a token it is a panel this UI can manage.
++export interface Server {
++  id?: number
++  name: string
++  url: string
++  token?: string
++  remark?: string
++}
+diff -ruN
+--- a/src/views/Relay.vue	1970-01-01 08:00:00.000000000 +0800
++++ b/src/views/Relay.vue	2026-10-04 15:03:11.878405100 +0800
+@@ -0,0 +1,256 @@
++<template>
++  <!-- ======================================================================
++    中转管理（Relay）
++    --------------------------------------------------------------------
++    「中转」在本面板里不是一个独立的数据模型，而是一组既有对象的组合：
++      1. 一个「落地出站」outbound（流量最终从哪个节点出去）
++      2. 一条「路由规则」route rule（action: route，inbound -> outbound）
++    只要一条路由规则的 outbound 指向一个真实出站，它就是一个中转。
++    本页面把这些组合从 config.route.rules + outbounds 里"算"出来展示，
++    并提供向导式创建 / 单个删除 / 全部删除 / 落地测速 / 客户端二维码。
++
++    后端无需任何新接口，全部复用：
++      - api/save    object=config   （改路由规则，会触发核心重启）
++      - api/save    object=outbounds（增删落地出站）
++      - api/checkOutbound ?tag=     （对落地出站做一次连通性测速）
++    ====================================================================== -->
++  <RelayWizard
++    v-model="wizardModal"
++    :visible="wizardModal"
++    @close="wizardModal = false"
++  />
++  <!-- 中转对用户是透明的：用户连的还是入口入站上的客户端，
++       所以"中转的二维码"就是入口入站上那些客户端的二维码 -->
++  <QrCode
++    v-model="qrcode.visible"
++    :visible="qrcode.visible"
++    :id="qrcode.id"
++    @close="qrcode.visible = false"
++  />
++  <!-- 一个入口入站上挂了多个客户端时，先让用户挑一个再出二维码 -->
++  <v-dialog v-model="picker.visible" width="320">
++    <v-card class="rounded-lg" :title="$t('pages.clients')">
++      <v-divider />
++      <v-list density="compact" nav>
++        <v-list-item v-for="c in picker.clients" :key="c.id" link @click="pickClient(c.id)">
++          <template #prepend><v-icon icon="mdi-qrcode" /></template>
++          <v-list-item-title>{{ c.name }}</v-list-item-title>
++        </v-list-item>
++      </v-list>
++    </v-card>
++  </v-dialog>
++  <ExportLinks
++    v-model="exportModal"
++    :visible="exportModal"
++    @close="exportModal = false"
++  />
++  <!-- 「全部删除」是不可逆操作，先弹确认框 -->
++  <v-dialog v-model="clearConfirm" width="380">
++    <v-card class="rounded-lg" :title="$t('relay.clearAll')">
++      <v-divider />
++      <v-card-text>{{ $t('relay.clearAllConfirm') }}</v-card-text>
++      <v-card-actions>
++        <v-spacer />
++        <v-btn color="success" variant="outlined" @click="clearConfirm = false">{{ $t('no') }}</v-btn>
++        <v-btn color="error" variant="tonal" :loading="clearLoading" @click="clearAllRelays">{{ $t('yes') }}</v-btn>
++      </v-card-actions>
++    </v-card>
++  </v-dialog>
++  <!-- 页面顶部操作区：添加中转 / 导出 / 全部删除 -->
++  <v-row justify="center" align="center">
++    <v-col cols="auto">
++      <v-btn color="primary" prepend-icon="mdi-transit-connection-variant" @click="wizardModal = true">{{ $t('relay.btn') }}</v-btn>
++    </v-col>
++    <v-col cols="auto">
++      <v-btn color="primary" variant="tonal" prepend-icon="mdi-export-variant" @click="exportModal = true">{{ $t('exportLinks.btn') }}</v-btn>
++    </v-col>
++    <v-col cols="auto" v-if="relays.length > 0">
++      <v-btn color="error" variant="tonal" prepend-icon="mdi-delete-sweep" :loading="clearLoading" @click="clearConfirm = true">{{ $t('relay.clearAll') }}</v-btn>
++    </v-col>
++  </v-row>
++  <!-- 空状态提示 -->
++  <v-row v-if="relays.length === 0">
++    <v-col cols="12" style="text-align: center; opacity: 0.6; margin-top: 30px;">{{ $t('relay.empty') }}</v-col>
++  </v-row>
++  <!-- 中转卡片列表：一张卡 = 一个落地出站 + 它的入口入站集合 -->
++  <v-row>
++    <v-col cols="12" sm="6" md="4" lg="3" v-for="(r, index) in relays" :key="r.outbound">
++      <v-card rounded="xl" elevation="5" min-width="200" :title="r.outbound">
++        <v-card-subtitle style="margin-top: -15px;">{{ r.type }} · {{ r.server }}</v-card-subtitle>
++        <v-card-text>
++          <v-row>
++            <!-- 入口：哪些入站（节点）的流量会走这个落地 -->
++            <v-col cols="4">{{ $t('relay.entry') }}</v-col>
++            <v-col cols="8">
++              <v-chip v-for="t in r.inbounds" :key="t" size="x-small" label class="ma-1">{{ t }}</v-chip>
++            </v-col>
++          </v-row>
++          <v-row>
++            <!-- 落地测速：点速度计图标对落地出站发一次探测 -->
++            <v-col cols="4">{{ $t('out.delay') }}</v-col>
++            <v-col cols="8">
++              <v-progress-circular v-if="checkResults[r.outbound]?.loading" indeterminate size="20" />
++              <v-icon v-else icon="mdi-speedometer" @click="checkOutbound(r.outbound)">
++                <v-tooltip activator="parent" location="top" :text="$t('actions.test')" />
++              </v-icon>
++              <v-chip v-if="checkResults[r.outbound] && !checkResults[r.outbound].loading && checkResults[r.outbound].success"
++                density="compact" size="small" color="success" variant="flat" class="ms-1">
++                {{ checkResults[r.outbound].data?.Delay + $t('date.ms') }}
++              </v-chip>
++              <v-icon v-else-if="checkResults[r.outbound] && !checkResults[r.outbound].loading"
++                size="small" color="error" icon="mdi-close-circle" class="ms-1" />
++            </v-col>
++          </v-row>
++        </v-card-text>
++        <v-divider />
++        <v-card-actions style="padding: 0;">
++          <!-- 二维码：给出入口入站上客户端的链接（用户实际连接用的） -->
++          <v-btn icon="mdi-qrcode" @click="showRelayQr(r)">
++            <v-icon />
++            <v-tooltip activator="parent" location="top" :text="$t('client.links')" />
++          </v-btn>
++          <!-- 删除：点图标后弹出二次确认覆盖层 -->
++          <v-btn icon="mdi-file-remove" color="warning" @click="delOverlay[index] = true">
++            <v-icon />
++            <v-tooltip activator="parent" location="top" :text="$t('actions.del')" />
++          </v-btn>
++          <v-overlay v-model="delOverlay[index]" contained class="align-center justify-center">
++            <v-card :title="$t('actions.del')" rounded="lg">
++              <v-divider />
++              <v-card-text>{{ $t('relay.delConfirm') }}</v-card-text>
++              <v-card-actions>
++                <v-btn color="error" variant="outlined" :loading="delLoading" @click="delRelay(r, index)">{{ $t('yes') }}</v-btn>
++                <v-btn color="success" variant="outlined" @click="delOverlay[index] = false">{{ $t('no') }}</v-btn>
++              </v-card-actions>
++            </v-card>
++          </v-overlay>
++        </v-card-actions>
++      </v-card>
++    </v-col>
++  </v-row>
++</template>
++
++<script lang="ts" setup>
++// ---------------------------------------------------------------------------
++// 中转管理页面
++// 复用与出站页一致的 checkOutbound 数据结构，保证两处展示行为一致。
++// ---------------------------------------------------------------------------
++import Data from '@/store/modules/data'
++import HttpUtils from '@/plugins/httputil'
++import RelayWizard from '@/layouts/modals/RelayWizard.vue'
++import QrCode from '@/layouts/modals/QrCode.vue'
++import ExportLinks from '@/layouts/modals/ExportLinks.vue'
++import { computed, ref } from 'vue'
++
++const wizardModal = ref(false)   // 「添加中转」向导弹窗
++const exportModal = ref(false)   // 「导出链接」弹窗
++const delOverlay = ref<boolean[]>([]) // 每张卡独立的删除确认覆盖层
++const delLoading = ref(false)
++const clearConfirm = ref(false)  // 「全部删除」确认框
++const clearLoading = ref(false)
++const checkResults = ref<Record<string, any>>({}) // 落地测速结果，按出站 tag 索引
++
++// 二维码弹窗：id 是客户端 id；入口入站上若只有一个客户端就直接出，
++// 多个则先弹选择列表（picker）
++const qrcode = ref({ visible: false, id: 0 })
++const picker = ref({ visible: false, clients: <any[]>[] })
++
++// 找出某个中转的入口入站上挂的所有客户端：
++//   入站 tag -> 入站 id -> clients 里 inbounds 包含该 id 的客户端
++const clientsForRelay = (r: any): any[] => {
++  const entryIds = (Data().inbounds || []).filter((i: any) => r.inbounds.includes(i.tag)).map((i: any) => i.id)
++  return (Data().clients || []).filter((c: any) => Array.isArray(c.inbounds) && c.inbounds.some((id: number) => entryIds.includes(id)))
++}
++const showRelayQr = (r: any) => {
++  const cls = clientsForRelay(r)
++  if (cls.length === 0) return
++  if (cls.length === 1) {
++    // 只有一个客户端：直接出它的二维码
++    qrcode.value.id = cls[0].id
++    qrcode.value.visible = true
++    return
++  }
++  // 多个客户端：先弹列表让用户挑
++  picker.value.clients = cls
++  picker.value.visible = true
++}
++const pickClient = (id: number) => {
++  picker.value.visible = false
++  qrcode.value.id = id
++  qrcode.value.visible = true
++}
++
++// ---------------------------------------------------------------------------
++// 中转列表（计算属性）：每次 config / outbounds 变化都会重算。
++// 判定标准：一条 route 规则的 action === 'route' 且 outbound 指向真实出站。
++// ---------------------------------------------------------------------------
++const relays = computed((): any[] => {
++  const config: any = Data().config || {}
++  const rules: any[] = config.route?.rules || []
++  const obs: any[] = Data().outbounds || []
++  const result: any[] = []
++  rules.forEach((rule: any) => {
++    if (rule && rule.action === 'route' && rule.outbound && rule.inbound) {
++      const ob = obs.find((o: any) => o.tag === rule.outbound)
++      if (ob) {
++        result.push({
++          outbound: ob.tag,
++          type: ob.type,
++          server: ob.server ?? '-',
++          // 规则里的 inbound 可能是字符串或数组，统一成数组展示
++          inbounds: Array.isArray(rule.inbound) ? rule.inbound : [rule.inbound],
++        })
++      }
++    }
++  })
++  return result
++})
++
++// 落地测速：与出站页同一接口（api/checkOutbound），15 秒内返回延迟或错误
++const checkOutbound = async (tag: string) => {
++  checkResults.value = { ...checkResults.value, [tag]: { loading: true, success: false } }
++  const msg = await HttpUtils.get<{ OK: boolean; Delay?: number; Error?: string }>('api/checkOutbound', { tag })
++  const success = msg.success && msg.obj?.OK
++  checkResults.value = { ...checkResults.value, [tag]: { loading: false, success, data: msg.obj ?? null } }
++}
++
++// ---------------------------------------------------------------------------
++// 删除一个中转 = 两步，顺序不能反：
++//   1) 先把指向该落地的路由规则从 config 里去掉并保存（会触发核心重启）
++//   2) 再删掉落地出站本身
++// 若先删出站，路由规则会短暂指向一个不存在的出站，核心可能起不来。
++// ---------------------------------------------------------------------------
++const delRelay = async (r: any, index: number) => {
++  delLoading.value = true
++  // 1) 深拷贝当前 config，过滤掉所有 action=route 且 outbound 指向该落地的规则
++  const config = JSON.parse(JSON.stringify(Data().config || {}))
++  if (config.route?.rules) {
++    config.route.rules = config.route.rules.filter(
++      (rule: any) => !(rule.action === 'route' && rule.outbound === r.outbound)
++    )
++  }
++  await Data().save('config', 'set', config)
++  // 2) 删除落地出站
++  await Data().save('outbounds', 'del', r.outbound)
++  delLoading.value = false
++  delOverlay.value[index] = false
++}
++
++// 全部删除：一次 config 保存去掉所有中转规则，再逐个删落地出站
++const clearAllRelays = async () => {
++  clearLoading.value = true
++  const tags = relays.value.map((r: any) => r.outbound)
++  const config = JSON.parse(JSON.stringify(Data().config || {}))
++  if (config.route?.rules) {
++    config.route.rules = config.route.rules.filter(
++      (rule: any) => !(rule.action === 'route' && tags.includes(rule.outbound))
++    )
++  }
++  await Data().save('config', 'set', config)
++  for (const tag of tags) {
++    await Data().save('outbounds', 'del', tag)
++  }
++  clearLoading.value = false
++  clearConfirm.value = false
++}
++</script>
+diff -ruN
+--- a/src/views/Servers.vue	1970-01-01 08:00:00.000000000 +0800
++++ b/src/views/Servers.vue	2026-10-04 11:46:46.932577600 +0800
+@@ -0,0 +1,337 @@
++<template>
++  <ServerModal
++    :visible="editModal.visible"
++    :server="editModal.server"
++    @close="editModal.visible = false"
++  />
++  <v-alert
++    v-if="currentServer"
++    type="warning"
++    variant="tonal"
++    density="compact"
++    class="mb-4"
++  >
++    <v-row
++      align="center"
++      class="ma-0"
++    >
++      <v-col class="pa-0">
++        {{ $t('server.managingHint', { name: managedName }) }}
++      </v-col>
++      <v-col cols="auto">
++        <v-btn
++          color="warning"
++          variant="outlined"
++          size="small"
++          @click="backToLocal"
++        >
++          {{ $t('server.backToLocal') }}
++        </v-btn>
++      </v-col>
++    </v-row>
++  </v-alert>
++  <v-row justify="center">
++    <v-col cols="auto">
++      <v-btn
++        color="primary"
++        prepend-icon="mdi-server-plus"
++        @click="showEdit(null)"
++      >
++        {{ $t('server.add') }}
++      </v-btn>
++    </v-col>
++    <v-col cols="auto">
++      <v-btn
++        variant="outlined"
++        prepend-icon="mdi-lan-pending"
++        :disabled="servers.length === 0"
++        @click="testAll"
++      >
++        {{ $t('actions.testAll') }}
++      </v-btn>
++    </v-col>
++  </v-row>
++  <v-row v-if="servers.length === 0">
++    <v-col
++      cols="12"
++      class="text-center text-medium-emphasis"
++    >
++      {{ $t('server.empty') }}
++    </v-col>
++  </v-row>
++  <v-row>
++    <v-col
++      v-for="(item, index) in servers"
++      :key="item.id"
++      cols="12"
++      sm="6"
++      md="4"
++      lg="3"
++    >
++      <v-card
++        rounded="xl"
++        elevation="5"
++        :title="item.name"
++        :color="currentServer === String(item.id) ? 'primary' : undefined"
++      >
++        <v-card-subtitle class="text-wrap">
++          {{ item.url }}
++        </v-card-subtitle>
++        <v-card-text>
++          <div class="mb-2">
++            <v-chip
++              v-if="statusOf(item).state === 'testing'"
++              size="small"
++              color="grey"
++              variant="tonal"
++            >
++              <v-progress-circular
++                size="12"
++                width="2"
++                indeterminate
++                class="mr-1"
++              />
++              {{ $t('server.testing') }}
++            </v-chip>
++            <v-chip
++              v-else-if="statusOf(item).state === 'online'"
++              size="small"
++              color="success"
++              variant="tonal"
++              prepend-icon="mdi-check-circle"
++            >
++              {{ statusOf(item).latency }} ms
++            </v-chip>
++            <v-chip
++              v-else-if="statusOf(item).state === 'offline'"
++              size="small"
++              color="error"
++              variant="tonal"
++              prepend-icon="mdi-alert-circle"
++            >
++              {{ $t('server.offline') }}<template v-if="statusOf(item).error">: {{ statusOf(item).error }}</template>
++            </v-chip>
++            <v-chip
++              v-else
++              size="small"
++              color="grey"
++              variant="tonal"
++            >
++              {{ $t('server.untested') }}
++            </v-chip>
++          </div>
++          <div
++            v-if="currentServer === String(item.id)"
++            class="font-weight-bold"
++          >
++            ● {{ $t('server.managing') }}
++          </div>
++          <div
++            v-if="item.remark"
++            class="text-medium-emphasis"
++          >
++            {{ item.remark }}
++          </div>
++        </v-card-text>
++        <v-divider />
++        <v-card-actions>
++          <v-btn
++            icon="mdi-lan-pending"
++            @click.stop="testServer(item)"
++          >
++            <v-icon />
++            <v-tooltip
++              activator="parent"
++              location="top"
++              :text="$t('server.test')"
++            />
++          </v-btn>
++          <v-btn
++            icon="mdi-cog"
++            color="primary"
++            @click.stop="manage(item)"
++          >
++            <v-icon />
++            <v-tooltip
++              activator="parent"
++              location="top"
++              :text="$t('server.manage')"
++            />
++          </v-btn>
++          <v-btn
++            icon="mdi-file-edit"
++            @click.stop="showEdit(item)"
++          >
++            <v-icon />
++            <v-tooltip
++              activator="parent"
++              location="top"
++              :text="$t('actions.edit')"
++            />
++          </v-btn>
++          <v-btn
++            icon="mdi-file-remove"
++            color="warning"
++            @click.stop="delOverlay[index] = true"
++          >
++            <v-icon />
++            <v-tooltip
++              activator="parent"
++              location="top"
++              :text="$t('actions.del')"
++            />
++          </v-btn>
++          <v-overlay
++            v-model="delOverlay[index]"
++            contained
++            class="align-center justify-center"
++          >
++            <v-card
++              :title="$t('actions.del')"
++              rounded="lg"
++            >
++              <v-divider />
++              <v-card-text>
++                {{ $t('confirm') }}
++                <!-- Opt-in, off by default: this talks to the remote and
++                     deletes every inbound on it. -->
++                <v-checkbox
++                  v-model="wipeNodes[index]"
++                  :label="$t('server.wipeNodes')"
++                  color="error"
++                  density="compact"
++                  hide-details
++                  class="mt-2"
++                />
++              </v-card-text>
++              <v-card-actions>
++                <v-btn
++                  color="error"
++                  variant="outlined"
++                  @click.stop="delServer(item, index)"
++                >
++                  {{ $t('yes') }}
++                </v-btn>
++                <v-btn
++                  color="success"
++                  variant="outlined"
++                  @click.stop="delOverlay[index] = false"
++                >
++                  {{ $t('no') }}
++                </v-btn>
++              </v-card-actions>
++            </v-card>
++          </v-overlay>
++        </v-card-actions>
++      </v-card>
++    </v-col>
++  </v-row>
++</template>
++
++<script lang="ts" setup>
++import Data from '@/store/modules/data'
++import HttpUtils from '@/plugins/httputil'
++import api from '@/plugins/api'
++import ServerModal from '@/layouts/modals/Server.vue'
++import { computed, ref, watch } from 'vue'
++import { useRouter } from 'vue-router'
++import type { Server } from '@/types/servers'
++
++const router = useRouter()
++
++const servers = computed((): Server[] => Data().servers ?? [])
++const currentServer = computed((): string => Data().currentServer)
++const managedName = computed((): string => {
++  const hit = servers.value.find(s => String(s.id) === currentServer.value)
++  return hit?.name ?? currentServer.value
++})
++
++const editModal = ref<{ visible: boolean, server: Server | null }>({ visible: false, server: null })
++const delOverlay = ref<boolean[]>([])
++const wipeNodes = ref<boolean[]>([])
++
++type ServerStatus = { state: 'idle' | 'testing' | 'online' | 'offline', latency?: number, error?: string }
++const statusMap = ref<Record<string, ServerStatus>>({})
++const statusOf = (item: Server): ServerStatus => statusMap.value[String(item.id)] ?? { state: 'idle' }
++
++// Probed through the backend, which calls the remote's APIv2 status endpoint
++// and times the round trip. The browser cannot do it itself: the token would
++// have to be handed to the page and the remote would have to answer CORS.
++async function testServer(item: Server) {
++  const key = String(item.id)
++  statusMap.value = { ...statusMap.value, [key]: { state: 'testing' } }
++  const r = await HttpUtils.get<{ online: boolean, latency?: number, error?: string }>('api/testServer', { id: item.id })
++  const o = r.obj ?? { online: false }
++  statusMap.value = {
++    ...statusMap.value,
++    [key]: o.online
++      ? { state: 'online', latency: o.latency }
++      : { state: 'offline', error: o.error },
++  }
++}
++
++function testAll() {
++  servers.value.forEach(testServer)
++}
++
++// Probe on arrival and again whenever the list changes (add, edit, delete).
++watch(servers, () => testAll(), { immediate: true })
++
++function showEdit(server: Server | null) {
++  editModal.value.server = server
++  editModal.value.visible = true
++}
++
++// Hand the whole UI over to this server and land on its inbounds.
++async function manage(item: Server) {
++  await Data().switchServer(String(item.id))
++  router.push('/inbounds')
++}
++
++async function backToLocal() {
++  await Data().switchServer('')
++  router.push('/servers')
++}
++
++// Delete every inbound on a remote, talking to it through the proxy header
++// directly so the local view is not overwritten with the remote's data.
++async function wipeRemoteNodes(serverId: string) {
++  // The header rides on both hops, and it is passed explicitly rather than
++  // relying on the interceptor: the server being wiped need not be the one
++  // currently selected, and the interceptor only fills the header in when the
++  // caller left it blank. The loop variable used to be named `id` as well and
++  // shadowed this one, so every delete was addressed to an inbound number
++  // instead of the server.
++  const headers = { 'X-Remote-Server': serverId }
++  const resp = await api.get('api/inbounds', { headers })
++  const inbounds: unknown[] = resp.data?.obj?.inbounds ?? []
++  for (const raw of inbounds) {
++    const inboundId = (raw as { id?: number }).id
++    if (inboundId == undefined) continue
++    await api.post('api/save',
++      { object: 'inbounds', action: 'del', data: JSON.stringify(inboundId) },
++      { headers })
++  }
++}
++
++async function delServer(item: Server, index: number) {
++  if (wipeNodes.value[index] && item.id != undefined) {
++    // An unreachable remote cannot be cleaned; the entry still goes, so the
++    // operator is never stuck with a broken row they cannot remove.
++    try {
++      await wipeRemoteNodes(String(item.id))
++    } catch {
++      // ignored on purpose — see above
++    }
++  }
++  const success = await Data().save('servers', 'del', item.id)
++  if (!success) return
++  // Removing the server we were managing has to release the selection too, or
++  // every later request keeps being proxied to something that no longer exists.
++  if (String(item.id) === currentServer.value) {
++    await Data().switchServer('')
++  }
++  delOverlay.value[index] = false
++  wipeNodes.value[index] = false
++}
++</script>
+diff -ruN
+--- a/src/views/Settings.vue	2026-09-16 08:54:08.000000000 +0800
++++ b/src/views/Settings.vue	2026-10-04 11:07:00.224469100 +0800
+@@ -46,6 +46,23 @@
+             {{ $t('actions.restartApp') }}
+           </v-btn>
+         </v-col>
++        <!-- Only rendered when GitHub actually reports something newer, so a
++           panel on a network that cannot reach GitHub shows no button at all
++           instead of one that always fails. -->
++        <v-col
++          v-if="updateInfo?.updateAvailable"
++          cols="auto"
++        >
++          <v-btn
++            variant="outlined"
++            color="success"
++            :loading="updating"
++            :disabled="stateChange"
++            @click="updatePanel"
++          >
++            {{ $t('actions.updatePanel') }} {{ updateInfo.latestVersion }}
++          </v-btn>
++        </v-col>
+         <!-- The core cannot be held down any other way: a plain stop is undone by
+            the watchdog within five seconds. -->
+         <v-col cols="auto">
+@@ -372,6 +389,17 @@
+ import Data from '@/store/modules/data'
+ const tab = ref("t1")
+ const loading:Ref = inject('loading')?? ref(false)
++
++// This panel's own build, as opposed to the sing-box core or the subscription
++// settings on this page.
++interface PanelUpdateInfo {
++  currentVersion: string
++  latestVersion: string
++  updateAvailable: boolean
++  repo: string
++}
++const updateInfo = ref<PanelUpdateInfo | null>(null)
++const updating = ref(false)
+ const oldSettings = ref<Record<string, string>>({})
+ 
+ const settings = ref({
+@@ -443,6 +471,34 @@
+ 
+ const maintenance = computed((): boolean => Data().maintenance)
+ 
++// Checked once when the page opens. A failed check is silently ignored: most
++// panels sit behind a network that cannot reach GitHub, and a banner on every
++// visit would be noise rather than information.
++async function checkUpdate() {
++  const msg = await HttpUtils.get<PanelUpdateInfo>('api/updateInfo')
++  if (msg.success) updateInfo.value = msg.obj
++}
++
++// Only starts the job. The updater detaches, installs and then restarts the
++// panel, so this answers long before anything has actually been replaced.
++async function updatePanel() {
++  if (!confirm(i18n.global.t('actions.updateConfirm'))) return
++  updating.value = true
++  const msg = await HttpUtils.post('api/updatePanel', {})
++  updating.value = false
++  if (msg.success) {
++    push.success({
++      title: i18n.global.t('actions.updateStarted'),
++      duration: 10000,
++    })
++    updateInfo.value = null
++  }
++}
++
++onMounted(() => {
++  checkUpdate()
++})
++
+ // Stopping the core is deliberate downtime for every user, so it is confirmed
+ // rather than done on a single click.
+ const toggleMaintenance = async () => {

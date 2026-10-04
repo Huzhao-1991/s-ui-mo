@@ -1,0 +1,2060 @@
+diff -ruN
+--- a/.github/workflows/release.yml	2026-09-16 08:54:30.000000000 +0800
++++ b/.github/workflows/release.yml	2026-10-04 11:12:05.817525200 +0800
+@@ -80,6 +80,19 @@
+       - name: Checkout repository
+         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+ 
++      # The version the panel reports and compares against GitHub has to come
++      # from the tag that triggered the build, not from whatever the committed
++      # config/version happens to say -- otherwise every release claims to be
++      # the previous one and the update button never fires.
++      - name: Stamp version from release tag
++        run: |
++          set -e
++          if [[ "${GITHUB_REF_TYPE}" == "tag" ]]; then
++            printf '%s' "${GITHUB_REF_NAME#v}" > config/version
++          fi
++          echo "panel version: $(cat config/version)"
++          echo "panel repo:    ${{ github.repository }}"
++
+       - name: Download frontend dist
+         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+         with:
+@@ -203,7 +216,7 @@
+           if [ "${{ matrix.naive }}" = "true" ]; then PROFILE=release; else PROFILE=test; fi
+           TAGS=$(tags_for "$PROFILE")
+           LDFLAGS=$(ldflags_for "$PROFILE")
+-          go build -ldflags="$LDFLAGS -linkmode external -extldflags '-static'" -tags "$TAGS" -o sui main.go
++          go build -ldflags="$LDFLAGS -linkmode external -extldflags '-static' -X github.com/alireza0/s-ui/config.PanelRepo=${{ github.repository }}" -tags "$TAGS" -o sui main.go
+           file sui
+           ldd sui 2>/dev/null || echo "Static binary confirmed"
+ 
+@@ -237,6 +250,19 @@
+       - name: Checkout repository
+         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+ 
++      # The version the panel reports and compares against GitHub has to come
++      # from the tag that triggered the build, not from whatever the committed
++      # config/version happens to say -- otherwise every release claims to be
++      # the previous one and the update button never fires.
++      - name: Stamp version from release tag
++        run: |
++          set -e
++          if [[ "${GITHUB_REF_TYPE}" == "tag" ]]; then
++            printf '%s' "${GITHUB_REF_NAME#v}" > config/version
++          fi
++          echo "panel version: $(cat config/version)"
++          echo "panel repo:    ${{ github.repository }}"
++
+       - name: Download frontend artifact
+         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+         with:
+@@ -276,7 +302,7 @@
+           . ./build-tags.sh
+           TAGS=$(tags_for windows)
+           LDFLAGS=$(ldflags_for windows)
+-          go build -ldflags="$LDFLAGS" -tags "$TAGS" -o sui.exe main.go
++          go build -ldflags="$LDFLAGS -X github.com/alireza0/s-ui/config.PanelRepo=${{ github.repository }}" -tags "$TAGS" -o sui.exe main.go
+           file sui.exe
+           
+           mkdir s-ui-windows
+diff -ruN
+--- a/.gitignore	2026-09-16 08:54:30.000000000 +0800
++++ b/.gitignore	2026-10-04 11:47:30.836977200 +0800
+@@ -10,6 +10,8 @@
+ tmp
+ .sync*
+ *.tar.gz
++# build-release.sh staging directories, one per target
++.stage-*
+ frontend/
+ 
+ # local env files
+diff -ruN
+--- a/Dockerfile	2026-09-16 08:54:30.000000000 +0800
++++ b/Dockerfile	2026-10-04 11:11:58.996049400 +0800
+@@ -12,6 +12,8 @@
+ WORKDIR /app
+ ARG TARGETARCH
+ ARG TARGETVARIANT
++# The repository this image checks for its own updates.
++ARG PANEL_REPO=OWNER/REPO
+ ENV CGO_ENABLED=1
+ ENV CGO_CFLAGS="-D_LARGEFILE64_SOURCE"
+ ENV GOARCH=$TARGETARCH
+@@ -43,7 +45,7 @@
+     . ./build-tags.sh && \
+     TAGS=$(tags_for docker) && \
+     LDFLAGS=$(ldflags_for docker) && \
+-    go build -ldflags="$LDFLAGS" -tags "$TAGS" -o sui main.go
++    go build -ldflags="$LDFLAGS -X github.com/alireza0/s-ui/config.PanelRepo=${PANEL_REPO}" -tags "$TAGS" -o sui main.go
+ 
+ FROM alpine:3.24.1@sha256:28bd5fe8b56d1bd048e5babf5b10710ebe0bae67db86916198a6eec434943f8b
+ LABEL org.opencontainers.image.authors="alireza7@gmail.com"
+diff -ruN
+--- a/README-mo.md	1970-01-01 08:00:00.000000000 +0800
++++ b/README-mo.md	2026-10-04 16:01:15.226323500 +0800
+@@ -0,0 +1,340 @@
++# S-UI 1.6.3 魔改版
++
++基于 [alireza0/s-ui](https://github.com/alireza0/s-ui) **v1.6.3**（2026-09-16 发布）的二次开发版本，
++把 [Teminuosi/s-ui](https://github.com/Teminuosi/s-ui)（基于 v1.4.2）里已验证过的体验改进，重新移植到 1.6.3 上。
++
++上游版权归原作者，本项目遵循 GPL-3.0。
++
++---
++
++## 1. 和魔改版的关系：为什么没有照搬
++
++原魔改版基于 **v1.4.2**，而 1.6.3 中间隔了 1.5.0 → 1.6.3 共十个版本。逐文件比对后，
++**它 README 里主打的几项功能，上游早已并入，而且实现更好**，所以这次没有搬：
++
++| 魔改版声称的功能 | 1.6.3 现状 | 本次处置 |
++|---|---|---|
++| 阶段1：协议模板（一键建 VLESS+Reality 等） | `core/protocol/` 已内置，且比魔改版**多** `snell`、`shadowsocks` | 不搬 |
++| `core/inbound_users.go` 客户端批量处理 | 已内置 | 不搬 |
++| Reject SSL handshake for unknown SNI | 已内置，且额外支持**证书热重载**（`certReloader`） | 不搬 |
++| hashed panel password | 已内置且更完整：`subtle.ConstantTimeCompare` + `BurnPasswordCheck` 防用户名枚举 | 不搬 |
++| 用 `X-Forwarded-For` 取客户端 IP | 1.6.3 改用 `c.ClientIP()`，走 gin 受信代理白名单，伪造头无效 | 不搬 |
++
++真正还差、本次移植的是下面五块。
++
++---
++
++## 2. 本次新增/移植的功能
++
++### 2.1 全自动安装（`SUI_AUTO=1`）
++
++```bash
++SUI_AUTO=1 bash <(curl -Ls https://raw.githubusercontent.com/<你的仓库>/main/install.sh)
++```
++
++- 全程零交互。新机器上**随机生成**管理员账号、密码、面板路径、订阅路径，装完打印一次。
++- **已装过的机器走「保留现有设置」分支**，不动账号与路径。这条规则是自更新功能的地基：
++  Web 点一下升级也是以 `SUI_AUTO=1` 重跑 install.sh，如果这里重新生成账号，点一下就把自己锁在面板外。
++- 端口被占用时自动顺延（默认从 2095/2096 起找空闲端口），不再出现「装完起不来且没有原因」。
++- 可用环境变量覆盖：`SUI_PORT` `SUI_PATH` `SUI_SUB_PORT` `SUI_SUB_PATH` `SUI_USER` `SUI_PASSWORD`。
++
++### 2.2 面板自更新（Web 一键升级）
++
++设置页点按钮 → 后端查 GitHub 最新 release → 下载 `install.sh` → **脱离面板进程**执行 → 装完重启面板。
++
++- `service/panel.go`：`GetUpdateInfo` / `StartUpdate` / `downloadPanelUpdater` / `fetchLatestPanelVersion`。
++- 关键点是**让更新进程活过面板自己**：优先用 `systemd-run` 起独立 unit；拿不到 systemd（容器等）退回 `setsid` 脱离进程组。否则脚本装到一半，父进程被杀，留下装了一半的树。
++- 下载的脚本有 2MB 上限，避免异常响应把磁盘写满。
++- 版本比较按「三段主版本号 → 后缀等级 → 后缀序号」来做，**能正确处理 `mo9` 与 `mo10`**（纯字符串比较会判反）。
++- 仓库地址不写死：构建期 `-ldflags -X .../config.PanelRepo=owner/repo`，或运行期环境变量 `SUI_PANEL_REPO` 覆盖。
++
++### 2.3 服务器列表 + 中转（多节点集中管理）
++
++新增一张 `servers` 表和一组接口，让一个面板能直接管理**其它 s-ui 实例**，不用二次登录。
++
++- 列表页 `/servers`：增删改查、在线探测（显示往返延迟 / `unreachable` / `bad token`）。
++- 点「管理」→ 前端开始给所有请求带 `X-Remote-Server` 头 → 后端把请求转发到目标实例的 **APIv2**（用该条目里存的 Token 鉴权）。
++- 于是整个面板 UI（入站、客户端、路由、TLS…）都在编辑那台远端机器。
++- 侧边栏标题下方会显示「当前正在管理 XXX」，列表页顶部有「返回本机面板」，**切错不会不知道**。
++- 选择持久化在 localStorage，刷新页面不会悄悄退回本机。
++- 删除条目时可勾选「同时删除该服务器上的全部入站」（默认关闭，破坏性操作）。
++
++哪些动作**永远在本机执行、绝不转发**：服务器列表本身、登录/登出、Token 管理、改密码、在线探测。
++否则远端就能通过代理改掉本机的凭据。
++
++### 2.4 安装 / 卸载修复
++
++- 新增 `install.sh purge`：只依赖 root，**不依赖任何已安装文件**，把 `/usr/local/s-ui`、`/etc/s-ui`、`/usr/bin/s-ui` 和服务定义全部清掉。
++- `s-ui uninstall` / 菜单卸载项**不再先检查「是否已安装」**：装到一半失败时状态本就是「未安装」，那道检查会变成死锁 —— 残留清不掉、重装也进不去。
++- `uninstall` 保留 `/etc/s-ui`（数据库），`purge` 才删。上游 README 里手写的卸载命令删错了对象（删的是 `sing-box.service`，且没删 `/etc/s-ui`），照做只会留一地残留。
++- 菜单新增第 21 项 Purge。
++
++### 2.5 若干修复
++
++- `s-ui token` 新子命令：为第一个管理员打印 APIv2 Token（默认复用已有 Token，`-new` 强制新建）。配置多节点时用来取 Token。Token 走 stdout、错误走 stderr，脚本里可 `TOKEN=$(s-ui token)` 直接接。
++  - **用完之后要重启一次面板**才会生效：这个子命令是另起一个进程直接写数据库的，而运行中的面板只在启动时加载一次 Token 表（面板界面里「添加 Token」按钮会就地重载，所以走界面的那条路不需要重启）。实测确认过这一点，别把它当成 Token 没配对。
++- `util/shadowsocks.go`：补上 `2022-blake3-aes-256-gcm`、`2022-blake3-chacha20-poly1305` 的两个 32 字节密钥方法映射 —— 缺失时生成的链接会用 16 字节密钥。
++
++---
++
++### 2.6 中转管理（入站流量经落地节点转发）
++
++新增独立页面 `/relay`（侧边栏「中转管理」，紧挨入站管理），把任意入站的出口流量整个改道到一台落地节点。
++这是参考魔改版最核心的功能，本次按其行为完整移植并加了成倍的注释。
++
++- **数据模型**：不新增表。「一个中转」= 一个落地出站 + 一条 `{inbound:[...], action:'route', outbound:tag}` 路由规则，
++  页面从 `config.route.rules` + `outbounds` 里实时推导展示，与出站/路由页永远一致。
++- **添加向导**：粘贴落地节点分享链接（`vless:// vmess:// trojan:// ss:// hysteria2:// tuic:// …`），
++  SOCKS5 另支持 `IP:端口:用户:密码` 裸写法（前端直接解析）；其余协议走 `api/linkConvert` 转换。
++  自动分配不冲突的出站 tag，保存出站与路由规则后立即 `api/checkOutbound` 探测落地连通性。
++- **入口默认全不选**：路由规则会把选中入站的出口整个改道，默认全选会把现有所有节点一次性推到落地 IP 后面
++  （「我原来的节点全变成中转的 IP 了」就是这么做出来的），所以必须手动挑。
++- **删除** = 先删路由规则、再删落地出站（顺序不能反，否则规则会短暂指向不存在的出站）；支持全部删除。
++- 每张中转卡片可单独测速、可出示**入口入站上客户端的二维码**（中转对用户透明，用户连的还是入口节点）。
++- 附带「导出链接」弹窗：所有客户端的订阅 URL / 全部分享链接（明文或 Base64 整包），直接粘进 v2rayN 批量导入。
++
++## 3. 相对原魔改版实现上的改进
++
++
++
++移植时没有逐行照抄，下面这些是刻意改掉的：
++
++1. **版本比较支持任意后缀**，不再只认识 `-qs`；且 `mo9`/`mo10` 不再判反。
++2. **更新源可配置**，不写死某个账号的仓库。
++3. **中转地址做校验**：只允许 `http`/`https`，缺 scheme 自动补，非法输入给出可读错误而不是一个 `http.NewRequest` 的晦涩报错。
++4. **远端条目没填 Token 时直接报错**，而不是带着空 Token 发一个必然 401 的请求。
++5. **切换节点时重置 `lastLoad`**：那个时间戳只对被请求的那台机器有意义，拿本机的时间戳去问远端「有什么变化」会拿到空增量、界面一片空白。
++6. **当前节点持久化到 localStorage**，并在侧边栏显示；原实现刷新页面就静默回到本机。
++7. **删除正在管理的节点时自动解除选中**，否则后续请求会一直被转发到一个已经不存在的条目上。
++8. **`servers` 不走 `api/load` 轮询**：`api/load` 会被转发到远端，而「列表里有哪些面板」是本机的属性，跟着轮询会被远端的表覆盖。
++
++---
++
++## 4. 构建
++
++需要 **Go 1.26.7+** 与 **Node 22+**，并且**必须在一台 Linux 机器上编译** —— 原因见 4.2。
++
++```bash
++# 1) 前端
++cd frontend && npm install && npm run build && cd ..
++rm -rf web/html/* && mkdir -p web/html && cp -r frontend/dist/* web/html/
++
++# 2) 后端（一条命令编出整张矩阵里装得上编译器的目标）
++PANEL_REPO=owner/repo ./build-release.sh
++
++# 只编一个目标
++PANEL_REPO=owner/repo ./build-release.sh linux/amd64
++
++# 全静态：自带 libc，任意发行版都能跑（amd64 用 musl-gcc）
++CC_NATIVE=musl-gcc SUI_STATIC=1 ./build-release.sh linux/amd64
++```
++
++产物在 `dist/`：`s-ui-linux-<arch>.tar.gz` + `SHA256SUMS` + `install.sh`。
++
++### 4.1 CGO 是硬要求
++
++`gorm.io/driver/sqlite` 底层是 `mattn/go-sqlite3`，**是 cgo 绑定**。
++用 `CGO_ENABLED=0` 编出来的是一个 stub：体积正常、编译零报错、`-v` 也能打印版本，
++但**第一次启动就死**：
++
++```
++InitDB: Binary was compiled with 'CGO_ENABLED=0', go-sqlite3 requires cgo to work. This is a stub
++```
++
++所以 `build-release.sh` 强制 `CGO_ENABLED=1`，并且**目标平台没有 C 编译器时明确跳过并提示**，
++而不是产出一个看着像正常包、丢到服务器上才发现起不来的二进制。
++
++交叉编译需要的包（Debian 12 / Ubuntu）：
++
++```bash
++apt-get install -y gcc musl-tools \
++    gcc-aarch64-linux-gnu gcc-arm-linux-gnueabihf \
++    libc6-dev-arm64-cross libc6-dev-armhf-cross
++```
++
++最后两个是**关键**。在 Debian 里它们是交叉 gcc 的 `Recommends`，用 `--no-install-recommends`
++装不会带上；缺了之后交叉 gcc 会**静默回退到宿主的 `/usr/include`**，报一串
++`bits/wordsize.h: No such file or directory` —— 看起来像编译器坏了，实际上只是少了两行包。
++
++### 4.2 为什么必须在 Linux 上编
++
++`with_purego`（运行时 dlopen cronet 而不是链接期）确实省掉了上游 CI 里那套 Chromium/cronet 工具链，
++但**它省的是 cronet，不是 cgo**。SQLite 这一条路仍然要真实的目标平台 C 编译器和目标 libc 头文件，
++所以 Windows / macOS 上无法直接出可用的 Linux 包（本机试过 `zig cc` 充当交叉 C 编译器，
++被安全软件在进程级拦掉了，不可行）。
++
++上游官方 CI 走的是 Bootlin musl sysroot，产出的是各类 arch 的**全静态 musl** 二进制；
++`build-release.sh` 在 amd64 上用 `musl-gcc` 得到同等效果，ARM 目标则用 Debian 交叉 gcc + `-static`
++（静态 glibc：能跑，但 DNS/NSS 走的是编进 libc 的那一套，不如 musl 干净）。
++想完全对齐上游，push 一个 tag，`.github/workflows/release.yml` 会用 Bootlin 工具链照旧产出。
++
++### 4.3 本次构建与验证记录
++
++在 Debian 12 / 1 核 / 973 MB 内存 / 4.9 GB 磁盘的 VPS 上实际跑通：
++
++| 项目 | 结果 |
++|---|---|
++| 工具链 | Go 1.26.8 + musl-gcc 12.2 + aarch64/armhf 交叉 gcc |
++| 前端 | `npm run build` 通过（含 `vue-tsc --noEmit` 类型检查），产物已嵌入 `web/html` |
++| amd64 | `s-ui-linux-amd64.tar.gz` 35 662 141 B，**ELF 64-bit LSB, statically linked, stripped** |
++| 版本 | `s-ui -v` → `S-UI Panel 1.6.3-mo2` / `Sing-Box v1.14.1` |
++| 安装 | `SUI_AUTO=1 bash install.sh` 全流程通过：下载 → SHA256 校验 → 解包 → 随机账号/路径 → systemd 启用并启动 |
++| 服务 | `s-ui.service` = enabled + active，监听 `*:2095`（面板）与 `*:2096`（订阅） |
++| 接口 | 登录、`api/settings`、`api/servers`、`api/updateInfo`、`api/save object=servers`（落库已回读）、`api/testServer` 全部符合预期 |
++| 中转 | 双实例实测：A 自身 `webPort=2095`，带 `X-Remote-Server` 请求返回 **B 的 `webPort=12096`**；`servers` 列表仍由 A 本地提供（守卫生效） |
++| 重装 | 再跑一次 `install.sh` 走「保留现有设置」分支，账号/路径不变、服务正常重启 |
++| 中转页 | `/relay` 登录后 200；向导全链路实测：建落地出站 → config 追加路由规则落库 → `checkOutbound` 探测 → 按页面同路径删除且无残留 |
++
++**本次交付只出 `linux/amd64` 一份包**（外加 `install.sh` 与 `SHA256SUMS`）。ARM 目标用同一条
++`./build-release.sh` 命令即可产出（见 4.1 的交叉编译依赖清单），只是没有纳入这次交付。
++
++构建过程本身也踩了两个只有小机器才会遇到的坑，记录在此以免复现：
++- **磁盘**：Go 构建缓存会长到 1.4 GB 量级，加上模块缓存后 4.9 GB 的盘会被写满，表现为
++  `mkdir ... no space left on device`。把交换分区从磁盘换到 **zram**（压缩内存交换，不占盘）
++  是最划算的一步。
++- **内存**：上面那台机器只有 973 MB 内存且是 1 核，靠 `GOMAXPROCS=1` + `GOGC=50` 让编译器
++  更早回收即可完成链接；全程 swap 用量不到 20 MB，瓶颈始终是磁盘而不是内存。
++
++---
++
++## 5. 安装 / 升级 / 卸载
++
++```bash
++# 全自动安装（推荐）
++SUI_AUTO=1 bash <(curl -Ls https://raw.githubusercontent.com/<你的仓库>/main/install.sh)
++
++# 交互式安装
++bash <(curl -Ls https://raw.githubusercontent.com/<你的仓库>/main/install.sh)
++
++# 卸载：删程序与服务，保留数据库
++s-ui uninstall
++# 彻底清除：数据库一起删
++s-ui purge        # 或 install.sh purge
++```
++
++装完 `s-ui` 打开管理菜单（启停/重启、改设置、改账号、SSL、BBR、Purge…）。
++
++---
++
++## 6. 把仓库地址改成你自己的
++
++安装脚本、菜单脚本、自更新都从「本仓库」取自己的安装包和更新脚本。默认值是占位符 `OWNER/REPO`，**必须改**：
++
++```bash
++./setrepo.sh yourname/s-ui-mo
++```
++
++它会改写 `install.sh`、`s-ui.sh`、`service/panel.go`、`config/config.go` 里的默认值。
++也可以完全不改源码，用环境变量临时覆盖：
++
++```bash
++SUI_REPO=yourname/s-ui-mo   bash install.sh     # 安装/升级源
++SUI_PANEL_REPO=yourname/s-ui-mo systemctl restart s-ui   # 自更新检查源
++```
++
++CI 发布时会自动用 `-X .../config.PanelRepo=${{ github.repository }}` 把真实仓库写进二进制，
++并从 tag 戳版本号到 `config/version`。
++
++---
++
++## 7. 本仓库的结构与打包方式
++
++这个仓库是**内置前端的自包含 fork**，布局和上游有意不同：
++
++| | 上游 `alireza0/s-ui` | 本仓库 |
++|---|---|---|
++| 前端 | 独立仓库 `s-ui-frontend`，主仓库用 `git submodule` 引用 | **前端源码直接内置**，`.gitmodules` 已删除 |
++| `frontend/` | 被 `.gitignore` 忽略（CI 另外拉取） | 随仓库分发，克隆即可看到全部前端改动 |
++| `web/html/` | 被忽略（构建时生成） | 已提交（前端已构建并嵌入，`go build` 开箱即用） |
++| 与上游的差异 | — | `patches/backend.patch` + `patches/frontend.patch` |
++
++目录大致长这样：
++
++```
++.
++├── api/ cmd/ config/ core/ database/ service/ util/ ...     Go 后端
++├── frontend/src/          前端源码（含 Relay.vue / RelayWizard.vue / ExportLinks.vue 等改动）
++├── web/html/              前端构建产物，被 go:embed 打进二进制
++├── patches/               相对上游 1.6.3 的完整 diff
++├── install.sh             一键安装脚本
++├── build-release.sh       跨平台交叉编译 + 打包
++└── README-mo.md           本文档
++```
++
++只编后端（`web/html` 已就位，不需要 Node）：
++
++```bash
++. ./build-tags.sh
++CGO_ENABLED=1 go build -tags "$(tags_for docker)" \
++  -ldflags "$(ldflags_for docker)" -o sui .
++```
++
++改过前端之后要同步一次嵌入目录：
++
++```bash
++cd frontend && npm install && npm run build && cd ..
++rm -rf web/html && mkdir -p web/html && cp -r frontend/dist/* web/html/
++```
++
++`patches/` 只覆盖**代码改动**；`.gitignore`、`.gitmodules` 这类打包元数据的差异不在补丁里。
++
++---
++
++## 8. 已知限制
++
++- **naive 出站**：本机交叉编译用的是 `with_purego` 配置，运行时需要 `libcronet.so` 才能用 naive（与本仓库 Dockerfile 的 docker profile 一致）。不涉及 naive 的部署无影响。
++- **翻译**：新增文案做了英文、简体中文、繁体中文；波斯语/越南语/俄语回退到英文（i18n 的 fallback 是 en）。
++- **自更新仅支持 Linux**：Windows 构建下点按钮会返回明确错误。
++- **官方 CI 的产物与本地手工构建不是同一套工具链**：CI 用 Bootlin musl sysroot（全静态 musl），
++  本机 amd64 用 `musl-gcc`（等价），ARM 目标用 Debian 交叉 gcc + `-static`（静态 glibc）。
++  两者都能跑，但 ARM 那两份的 DNS/NSS 走静态 glibc 的内置实现，不如 musl 干净；要更干净就直接用 CI 产出。
++
++---
++
++## 9. 改动清单
++
++后端：
++
++| 文件 | 说明 |
++|---|---|
++| `database/model/server.go` | 新增：Server 模型（name/url/token/remark） |
++| `service/serverlist.go` | 新增：ServerListService（GetAll/GetById/Save） |
++| `database/schema.go` | 注册 `servers` 表 → 自动迁移 + 纳入备份 |
++| `service/config.go` | ConfigService 接入 ServerListService；Save 分发 `servers` |
++| `api/remote.go` | 新增：中转中间件、转发、地址校验、在线探测 |
++| `api/apiService.go` | 接入 ServerListService；`servers` 局部刷新；updateInfo/updatePanel |
++| `api/apiHandler.go` | 注册中转中间件与新路由 |
++| `service/panel.go` | 面板自更新全套 |
++| `service/user.go` | `GetOrCreateToken` |
++| `cmd/token.go` / `cmd/cmd.go` | `s-ui token` 子命令 |
++| `util/shadowsocks.go` | SS-2022 32 字节密钥方法 |
++| `config/config.go` | `PanelRepo` / `GetPanelRepo` |
++| `config/version` | `1.6.3-mo2` |
++
++前端：
++
++| 文件 | 说明 |
++|---|---|
++| `src/plugins/remote.ts` | 新增：当前被管理面板的 id（含持久化） |
++| `src/types/servers.ts` | 新增：Server 类型 |
++| `src/layouts/modals/Server.vue` | 新增：服务器增改弹窗 |
++| `src/views/Servers.vue` | 新增：服务器列表页 |
++| `src/plugins/api.ts` | 每个请求注入 `X-Remote-Server` |
++| `src/store/modules/data.ts` | servers / currentServer / loadServers / switchServer |
++| `src/router/index.ts` | `/servers` 路由；启动时拉一次列表 |
++| `src/layouts/default/Drawer.vue` | 菜单项 + 当前管理对象提示 |
++| `src/views/Settings.vue` | 版本检查 + 一键升级按钮 |
++| `src/locales/{en,zhcn,zhtw}.ts` | 新增文案 |
++
++脚本 / CI：
++
++| 文件 | 说明 |
++|---|---|
++| `install.sh` | `SUI_AUTO` 全自动、`purge`/`uninstall`、`SUI_REPO`、端口避让 |
++| `s-ui.sh` | `SUI_REPO`、卸载保留数据库、`purge`、`token`、菜单第 21 项 |
++| `setrepo.sh` | 新增：一键替换仓库占位符 |
++| `build-release.sh` | 新增：跨平台交叉编译 + 打包 + SHA256SUMS |
++| `.github/workflows/release.yml` | tag 戳版本号、注入 PanelRepo |
++| `Dockerfile` | `ARG PANEL_REPO` |
++
++`patches/backend.patch`、`patches/frontend.patch` 是相对上游的完整 diff，便于逐行审阅。
+diff -ruN
+--- a/README.md	2026-09-16 08:54:30.000000000 +0800
++++ b/README.md	2026-10-04 16:01:27.209500600 +0800
+@@ -1,4 +1,11 @@
+ # S-UI
++
++> **这是魔改版（s-ui-mo），基于上游 S-UI 1.6.3 二次开发。**
++> 改动说明、构建方式与安装方法见 **[README-mo.md](README-mo.md)**。
++> 相对上游新增：多节点服务器列表 + 跨节点中转、中转管理页面、全自动安装、面板一键自更新。
++>
++> 以下为上游原版 README，保留作参考。
++
+ **An Advanced Web Panel • Built on SagerNet/Sing-Box**
+ 
+ ![](https://img.shields.io/github/v/release/alireza0/s-ui.svg)
+diff -ruN
+--- a/api/apiHandler.go	2026-09-16 08:54:30.000000000 +0800
++++ b/api/apiHandler.go	2026-10-04 11:01:10.916365300 +0800
+@@ -27,6 +27,9 @@
+ 			checkLogin(c)
+ 		}
+ 	})
++	// Runs after checkLogin, so a proxied request is still authenticated as a
++	// local user before it is forwarded with the remote's own token.
++	g.Use(a.ApiService.remoteMiddleware)
+ 	g.POST("/:postAction", a.postHandler)
+ 	g.GET("/:getAction", a.getHandler)
+ }
+@@ -42,6 +45,8 @@
+ 		a.ApiService.ChangePass(c)
+ 	case "save":
+ 		a.ApiService.Save(c, loginUser)
++	case "updatePanel":
++		a.ApiService.UpdatePanel(c)
+ 	case "restartApp":
+ 		a.ApiService.RestartApp(c)
+ 	case "restartSb":
+@@ -79,7 +84,7 @@
+ 		a.ApiService.Logout(c)
+ 	case "load":
+ 		a.ApiService.LoadData(c)
+-	case "inbounds", "outbounds", "endpoints", "services", "tls", "clients", "config":
++	case "inbounds", "outbounds", "endpoints", "services", "tls", "clients", "servers", "config":
+ 		err := a.ApiService.LoadPartialData(c, []string{action})
+ 		if err != nil {
+ 			jsonMsg(c, action, err)
+@@ -91,6 +96,8 @@
+ 		a.ApiService.GetSettings(c)
+ 	case "stats":
+ 		a.ApiService.GetStats(c)
++	case "updateInfo":
++		a.ApiService.GetUpdateInfo(c)
+ 	case "status":
+ 		a.ApiService.GetStatus(c)
+ 	case "onlines":
+@@ -111,6 +118,8 @@
+ 		a.ApiService.GetSingboxConfig(c)
+ 	case "checkOutbound":
+ 		a.ApiService.GetCheckOutbound(c)
++	case "testServer":
++		a.ApiService.TestServer(c)
+ 	default:
+ 		jsonMsg(c, "failed", common.NewError("unknown action: ", action))
+ 	}
+diff -ruN
+--- a/api/apiService.go	2026-09-16 08:54:30.000000000 +0800
++++ b/api/apiService.go	2026-10-04 11:01:10.906392800 +0800
+@@ -28,6 +28,7 @@
+ 	service.PanelService
+ 	service.StatsService
+ 	service.ServerService
++	service.ServerListService
+ }
+ 
+ func (a *ApiService) LoadData(c *gin.Context) {
+@@ -166,6 +167,12 @@
+ 				return err
+ 			}
+ 			data[obj] = clients
++		case "servers":
++			servers, err := a.ServerListService.GetAll()
++			if err != nil {
++				return err
++			}
++			data[obj] = servers
+ 		case "config":
+ 			config, err := a.SettingService.GetConfig()
+ 			if err != nil {
+@@ -203,6 +210,24 @@
+ 	jsonObj(c, data, err)
+ }
+ 
++// GetUpdateInfo reports whether the tracked repository has a newer release.
++// A failure (offline box, GitHub unreachable from the network the panel sits
++// in) is surfaced as an error rather than folded into "up to date": reporting
++// the current version on a failed check hides the exact case the operator is
++// looking at the page to diagnose.
++func (a *ApiService) GetUpdateInfo(c *gin.Context) {
++	info, err := a.PanelService.GetUpdateInfo()
++	jsonObj(c, info, err)
++}
++
++// UpdatePanel starts the one-click panel upgrade. It only launches the job:
++// the updater detaches and then restarts the panel, so this response is
++// deliberately sent before anything has actually been installed.
++func (a *ApiService) UpdatePanel(c *gin.Context) {
++	err := a.PanelService.StartUpdate()
++	jsonMsg(c, "updatePanel", err)
++}
++
+ func (a *ApiService) GetStats(c *gin.Context) {
+ 	resource := c.Query("resource")
+ 	tag := c.Query("tag")
+diff -ruN
+--- a/api/remote.go	1970-01-01 08:00:00.000000000 +0800
++++ b/api/remote.go	2026-10-04 13:06:25.070914600 +0800
+@@ -0,0 +1,258 @@
++package api
++
++import (
++	"bytes"
++	"encoding/json"
++	"io"
++	"net/http"
++	"net/url"
++	"path"
++	"strconv"
++	"strings"
++	"time"
++
++	"github.com/alireza0/s-ui/util/common"
++
++	"github.com/gin-gonic/gin"
++)
++
++// remoteLocalOnly lists the actions that must always execute on the panel the
++// browser is actually talking to, never on a remote it is proxying for. Server
++// registry, authentication and token management are per-installation concerns;
++// forwarding them would let a remote edit this panel's own credentials.
++var remoteLocalOnly = map[string]bool{
++	"servers":     true,
++	"testServer":  true,
++	"login":       true,
++	"logout":      true,
++	"tokens":      true,
++	"addToken":    true,
++	"deleteToken": true,
++	"changePass":  true,
++}
++
++// remoteMiddleware forwards a request to another s-ui instance's APIv2 (token
++// auth) whenever the browser sets X-Remote-Server, so the central panel can
++// manage remote instances with the same UI instead of a second login.
++//
++// The header is set by the frontend from the selected server in the launcher;
++// with nothing selected the request is handled locally and this is a no-op.
++func (a *ApiService) remoteMiddleware(c *gin.Context) {
++	serverId := c.GetHeader("X-Remote-Server")
++	if serverId == "" {
++		return
++	}
++	action := path.Base(c.Request.URL.Path)
++	if remoteLocalOnly[action] {
++		return
++	}
++	// The server registry is a central-panel concept, but its writes travel
++	// through the generic "save" action, so the action name alone cannot tell
++	// them apart -- object=servers lives in the body. Without this check a new
++	// or deleted entry would be POSTed to the remote, which either errors out
++	// or, worse, "succeeds" remotely while the local table never changes.
++	if action == "save" && peekFormValue(c, "object") == "servers" {
++		return
++	}
++	a.proxyToRemote(c, serverId, action)
++	c.Abort()
++}
++
++// peekFormValue reads a single urlencoded form field without consuming the
++// body. It buffers the body, parses a copy, then restores it so a request that
++// does end up being proxied still forwards its complete payload.
++func peekFormValue(c *gin.Context, key string) string {
++	if c.Request.Body == nil {
++		return ""
++	}
++	b, err := io.ReadAll(c.Request.Body)
++	c.Request.Body = io.NopCloser(bytes.NewReader(b))
++	if err != nil {
++		return ""
++	}
++	vals, err := url.ParseQuery(string(b))
++	if err != nil {
++		return ""
++	}
++	return vals.Get(key)
++}
++
++// remoteCandidates expands a stored panel address into the base URLs worth
++// trying, most specific first.
++//
++// The panel mounts its APIv2 under webPath -- "/app/" as shipped, but it is a
++// setting the operator can change -- and its NoRoute handler answers a bare 404
++// for every path outside that base. So "https://host:2095", which is how nearly
++// every other service is configured, would fail with a 404 that says nothing
++// about the real cause. The address as stored always comes first; the shipped
++// default path is appended only when the address carries no path of its own, so
++// a deliberately configured custom path is never second-guessed.
++func remoteCandidates(raw string) ([]string, error) {
++	base, err := normalizeRemoteBase(raw)
++	if err != nil {
++		return nil, err
++	}
++	bases := []string{base}
++	if parsed, perr := url.Parse(base); perr == nil && (parsed.Path == "" || parsed.Path == "/") {
++		bases = append(bases, base+"app/")
++	}
++	return bases, nil
++}
++
++func (a *ApiService) proxyToRemote(c *gin.Context, serverId string, action string) {
++	server, err := a.ServerListService.GetById(serverId)
++	if err != nil || server == nil || server.Url == "" {
++		jsonMsg(c, "", common.NewError("remote server not found"))
++		return
++	}
++	bases, err := remoteCandidates(server.Url)
++	if err != nil {
++		jsonMsg(c, "", err)
++		return
++	}
++	if server.Token == "" {
++		jsonMsg(c, "", common.NewError("remote server has no API token configured"))
++		return
++	}
++
++	// Read the body once and replay it. A retry against the next candidate has
++	// to carry the same payload; a one-shot reader would send the second
++	// attempt empty and the remote would answer "unknown action" or worse.
++	var payload []byte
++	if c.Request.Method == http.MethodPost {
++		payload, _ = io.ReadAll(c.Request.Body)
++	}
++
++	client := &http.Client{Timeout: 30 * time.Second}
++	var resp *http.Response
++	var respBody []byte
++	for i, base := range bases {
++		target := base + "apiv2/" + url.PathEscape(action)
++		if c.Request.URL.RawQuery != "" {
++			target += "?" + c.Request.URL.RawQuery
++		}
++
++		var body io.Reader
++		if payload != nil {
++			body = bytes.NewReader(payload)
++		}
++		req, reqErr := http.NewRequest(c.Request.Method, target, body)
++		if reqErr != nil {
++			jsonMsg(c, "", reqErr)
++			return
++		}
++		req.Header.Set("Token", server.Token)
++		if ct := c.Request.Header.Get("Content-Type"); ct != "" {
++			req.Header.Set("Content-Type", ct)
++		}
++
++		resp, err = client.Do(req)
++		if err != nil {
++			jsonMsg(c, "", err)
++			return
++		}
++		respBody, _ = io.ReadAll(resp.Body)
++		_ = resp.Body.Close()
++
++		// Only a 404 is worth a second attempt: NoRoute answers exactly that,
++		// with an empty body, for any path outside the panel's base path.
++		if resp.StatusCode != http.StatusNotFound || i == len(bases)-1 {
++			break
++		}
++	}
++
++	contentType := resp.Header.Get("Content-Type")
++	if contentType == "" {
++		contentType = "application/json"
++	}
++	c.Data(resp.StatusCode, contentType, respBody)
++}
++
++// normalizeRemoteBase validates a stored panel address and returns it with a
++// trailing slash. Only http/https are accepted: a "file://" or bare host entry
++// would otherwise be handed straight to http.NewRequest and fail with an
++// opaque error instead of a message the operator can act on.
++func normalizeRemoteBase(raw string) (string, error) {
++	raw = strings.TrimSpace(raw)
++	if raw == "" {
++		return "", common.NewError("remote server url is empty")
++	}
++	if !strings.Contains(raw, "://") {
++		raw = "http://" + raw
++	}
++	parsed, err := url.Parse(raw)
++	if err != nil {
++		return "", common.NewErrorf("remote server url is invalid: %v", err)
++	}
++	if parsed.Scheme != "http" && parsed.Scheme != "https" {
++		return "", common.NewErrorf("remote server url must be http or https, got %q", parsed.Scheme)
++	}
++	if parsed.Host == "" {
++		return "", common.NewError("remote server url has no host")
++	}
++	out := strings.TrimSuffix(parsed.String(), "/") + "/"
++	return out, nil
++}
++
++// TestServer probes a registered remote by calling its APIv2 status endpoint
++// with the stored token and times the round trip. It reports latency and a
++// short reason on failure, so the launcher can show whether the link really
++// works instead of leaving the operator to guess from a blank page.
++func (a *ApiService) TestServer(c *gin.Context) {
++	id := c.Query("id")
++	server, err := a.ServerListService.GetById(id)
++	if err != nil || server == nil || server.Url == "" {
++		jsonObj(c, gin.H{"online": false, "error": "server not found"}, nil)
++		return
++	}
++	bases, err := remoteCandidates(server.Url)
++	if err != nil {
++		jsonObj(c, gin.H{"online": false, "error": err.Error()}, nil)
++		return
++	}
++
++	client := &http.Client{Timeout: 8 * time.Second}
++	reason := "unreachable"
++	for _, base := range bases {
++		req, reqErr := http.NewRequest(http.MethodGet, base+"apiv2/status", nil)
++		if reqErr != nil {
++			jsonObj(c, gin.H{"online": false, "error": reqErr.Error()}, nil)
++			return
++		}
++		req.Header.Set("Token", server.Token)
++
++		start := time.Now()
++		resp, doErr := client.Do(req)
++		latency := time.Since(start).Milliseconds()
++		if doErr != nil {
++			reason = "unreachable"
++			continue
++		}
++		body, _ := io.ReadAll(resp.Body)
++		_ = resp.Body.Close()
++
++		var parsed struct {
++			Success bool `json:"success"`
++		}
++		isJSON := json.Unmarshal(body, &parsed) == nil
++
++		if resp.StatusCode == http.StatusOK && isJSON {
++			if !parsed.Success {
++				// Reached a real s-ui APIv2 that refused the token. Trying the
++				// other candidate cannot change that, so stop here rather than
++				// reporting "unreachable" for a server that answered.
++				jsonObj(c, gin.H{"online": false, "latency": latency, "error": "bad token"}, nil)
++				return
++			}
++			jsonObj(c, gin.H{"online": true, "latency": latency, "base": base}, nil)
++			return
++		}
++		if resp.StatusCode == http.StatusNotFound {
++			reason = "http 404, check the url includes the panel path (default /app/)"
++		} else {
++			reason = "http " + strconv.Itoa(resp.StatusCode)
++		}
++	}
++
++	jsonObj(c, gin.H{"online": false, "error": reason}, nil)
++}
+diff -ruN
+--- a/build-release.sh	1970-01-01 08:00:00.000000000 +0800
++++ b/build-release.sh	2026-10-04 12:42:59.610113500 +0800
+@@ -0,0 +1,160 @@
++#!/bin/sh
++# Cross-compile the Linux release archives.
++#
++# CGO IS MANDATORY. The storage layer opens SQLite through
++# gorm.io/driver/sqlite, which is built on mattn/go-sqlite3 -- a cgo binding.
++# Compiled with CGO_ENABLED=0 that binding becomes a stub, and the panel dies
++# on its very first start:
++#
++#     InitDB: Binary was compiled with 'CGO_ENABLED=0', go-sqlite3 requires
++#     cgo to work. This is a stub
++#
++# The binary looks fine, is the right size, and produces no build error. So
++# this script treats a C compiler for the target as a hard requirement and
++# refuses (or skips, with instructions) rather than emitting that trap.
++#
++# The naive outbound is built with what build-tags.sh calls the "docker"
++# profile: with_purego opens the cronet library at runtime instead of linking
++# it, so the Chromium toolchain upstream's release job assembles is not needed
++# here. Upstream uses the same profile for its own container image.
++#
++# Usage:
++#   ./build-release.sh                       # every target whose compiler exists
++#   ./build-release.sh linux/amd64           # selected targets
++#   SUI_STATIC=1 ./build-release.sh          # add -static (musl / fully portable)
++#   CC_arm64=aarch64-linux-musl-gcc ./build-release.sh linux/arm64
++set -eu
++
++cd "$(dirname "$0")"
++
++PANEL_REPO="${PANEL_REPO:-OWNER/REPO}"
++MODULE="github.com/alireza0/s-ui"
++OUT="${OUT:-dist}"
++VERSION="$(cat config/version 2>/dev/null || echo dev)"
++VERSION="${VERSION%$'\n'}"
++
++if [ ! -d web/html ] || [ -z "$(ls -A web/html 2>/dev/null)" ]; then
++    echo "web/html is empty -- run: (cd frontend && npm install && npm run build) && rm -rf web/html/* && cp -r frontend/dist/* web/html/" >&2
++    exit 1
++fi
++
++# shellcheck disable=SC1091
++. ./build-tags.sh
++TAGS=$(tags_for docker)
++LDFLAGS="$(ldflags_for docker) -X ${MODULE}/config.PanelRepo=${PANEL_REPO}"
++
++# The C compiler for one target. CC_<plat> wins, then a per-platform default.
++# The defaults are the Debian/Ubuntu cross packages; install them with e.g.
++#   apt-get install -y gcc-aarch64-linux-gnu gcc-arm-linux-gnueabihf
++cc_for() {
++    plat="$1"
++    eval "override=\${CC_${plat}:-}"
++    if [ -n "$override" ]; then
++        echo "$override"
++        return
++    fi
++    case "$plat" in
++    amd64) echo "${CC_NATIVE:-gcc}" ;;
++    arm64) echo "aarch64-linux-gnu-gcc" ;;
++    armv7 | armv6) echo "arm-linux-gnueabihf-gcc" ;;
++    386) echo "${CC_NATIVE:-gcc} -m32" ;;
++    *) echo "" ;;
++    esac
++}
++
++targets="${*:-linux/amd64 linux/arm64 linux/armv7 linux/armv6 linux/386 linux/s390x}"
++
++rm -rf "$OUT"
++mkdir -p "$OUT"
++
++export GOFLAGS="${GOFLAGS:--mod=mod}"
++export CGO_ENABLED=1
++
++built=""
++skipped=""
++
++for t in $targets; do
++    plat="${t#*/}"
++    goarch="$plat"
++    goarm=""
++    case "$plat" in
++    armv7) goarch=arm; goarm=7 ;;
++    armv6) goarch=arm; goarm=6 ;;
++    armv5) goarch=arm; goarm=5 ;;
++    esac
++
++    cc="$(cc_for "$plat")"
++    ccbin="${cc%% *}"
++    if [ -n "$ccbin" ] && ! command -v "$ccbin" >/dev/null 2>&1; then
++        echo "=== linux/${plat}: skipped, no C compiler '${ccbin}' on PATH ==="
++        skipped="${skipped} linux/${plat}"
++        continue
++    fi
++
++    echo "=== linux/${plat}  (GOARCH=${goarch}${goarm:+ GOARM=$goarm}  CC=${cc:-none}) ==="
++
++    stmp=".stage-${plat}"
++    rm -rf "$stmp"
++    mkdir -p "$stmp/s-ui"
++
++    # Exported rather than prefixed onto the command line. A word produced by a
++    # parameter expansion is never recognised as an assignment prefix, so the
++    # earlier `${goarm:+GOARM="$goarm"}` form was parsed as a command named
++    # "GOARM=7" and failed with "command not found" on every arm target.
++    # GOARM is unset when unused so it cannot leak into a later platform.
++    GOOS=linux GOARCH="$goarch"
++    export GOOS GOARCH
++    if [ -n "$goarm" ]; then
++        GOARM="$goarm"
++        export GOARM
++    else
++        unset GOARM
++    fi
++    if [ -n "$cc" ]; then
++        CC="$cc"
++        export CC
++    fi
++
++    build_ldflags="$LDFLAGS"
++    if [ "${SUI_STATIC:-0}" = "1" ]; then
++        # A fully static binary carries its own libc, which is what lets one
++        # tarball run on any distribution instead of only on ones at least as
++        # new as the build host.
++        #
++        # External link mode is mandatory: the internal linker silently ignores
++        # -static and emits a dynamically linked executable anyway. The single
++        # quotes are for Go's -ldflags parser, not for the shell -- the whole
++        # string is handed to the compiler as one argument.
++        #
++        # Pair with a musl C compiler. Static glibc warns about getaddrinfo and
++        # can only resolve hostnames through whatever NSS is compiled into
++        # libc; musl has no such split.
++        build_ldflags="$build_ldflags -linkmode external -extldflags '-static'"
++    fi
++
++    go build -trimpath -ldflags="$build_ldflags" -tags "$TAGS" -o "$stmp/s-ui/sui" main.go
++    cp s-ui.service s-ui.sh "$stmp/s-ui/"
++    chmod +x "$stmp/s-ui/sui" "$stmp/s-ui/s-ui.sh"
++    tar -C "$stmp" -czf "$OUT/s-ui-linux-${plat}.tar.gz" s-ui
++    # Tolerant on purpose: the archive is already written, so a staging
++    # directory that refuses to go (a virus scanner holding the freshly built
++    # executable, say) must not abort the rest of the matrix.
++    rm -rf "$stmp" || true
++    built="${built} linux/${plat}"
++done
++
++# Ship the one-click installer next to the archives. install.sh is not part of
++# the upstream tarball (it is uploaded as a separate release asset), but this
++# delivery is meant to be dropped onto a server as-is, so it travels with it.
++cp install.sh "$OUT/install.sh"
++chmod +x "$OUT/install.sh"
++
++if [ -n "$(ls -A "$OUT" 2>/dev/null)" ]; then
++    ( cd "$OUT" && sha256sum ./*.tar.gz > SHA256SUMS )
++fi
++
++echo
++echo "built s-ui ${VERSION}:${built:- none}"
++[ -n "$skipped" ] && echo "skipped (no compiler):${skipped}"
++[ -n "$built" ] && ( cd "$OUT" && cat SHA256SUMS )
++exit 0
+diff -ruN
+--- a/cmd/cmd.go	2026-09-16 08:54:30.000000000 +0800
++++ b/cmd/cmd.go	2026-10-04 11:01:51.944225100 +0800
+@@ -17,6 +17,7 @@
+ 	adminCmd := flag.NewFlagSet("admin", flag.ExitOnError)
+ 	settingCmd := flag.NewFlagSet("setting", flag.ExitOnError)
+ 	backupCmd := flag.NewFlagSet("backup", flag.ExitOnError)
++	tokenCmd := flag.NewFlagSet("token", flag.ExitOnError)
+ 
+ 	var username string
+ 	var password string
+@@ -38,6 +39,11 @@
+ 	settingCmd.IntVar(&subPort, "subPort", 0, "set sub port")
+ 	settingCmd.StringVar(&subPath, "subPath", "", "set sub path")
+ 
++	var tokenDesc string
++	var tokenNew bool
++	tokenCmd.StringVar(&tokenDesc, "desc", "", "description for the token")
++	tokenCmd.BoolVar(&tokenNew, "new", false, "always mint a fresh token instead of reusing one")
++
+ 	adminCmd.BoolVar(&show, "show", false, "show first admin credentials")
+ 	adminCmd.BoolVar(&reset, "reset", false, "reset first admin credentials")
+ 	adminCmd.BoolVar(&assumeYes, "yes", false, "skip the confirmation prompt for -reset")
+@@ -55,12 +61,15 @@
+ 		fmt.Println("    setting        set/reset/show settings")
+ 		fmt.Println("    healthcheck    exit 0 if the panel is listening on its configured port")
+ 		fmt.Println("    backup         create a database backup")
++		fmt.Println("    token          print an APIv2 token for the first admin")
+ 		fmt.Println()
+ 		adminCmd.Usage()
+ 		fmt.Println()
+ 		settingCmd.Usage()
+ 		fmt.Println()
+ 		backupCmd.Usage()
++		fmt.Println()
++		tokenCmd.Usage()
+ 	}
+ 
+ 	flag.Parse()
+@@ -123,6 +132,14 @@
+ 			showSetting()
+ 		}
+ 
++	case "token":
++		err := tokenCmd.Parse(os.Args[2:])
++		if err != nil {
++			fmt.Println(err)
++			return
++		}
++		genToken(tokenDesc, tokenNew)
++
+ 	case "backup":
+ 		err := backupCmd.Parse(os.Args[2:])
+ 		if err != nil {
+diff -ruN
+--- a/cmd/token.go	1970-01-01 08:00:00.000000000 +0800
++++ b/cmd/token.go	2026-10-04 11:01:51.164771700 +0800
+@@ -0,0 +1,43 @@
++package cmd
++
++import (
++	"fmt"
++	"os"
++
++	"github.com/alireza0/s-ui/config"
++	"github.com/alireza0/s-ui/database"
++	"github.com/alireza0/s-ui/service"
++)
++
++// genToken prints an APIv2 token for the first admin.
++//
++// The token goes to stdout and every failure goes to stderr, so a provisioning
++// script can capture it with  TOKEN=$(s-ui token)  while a broken database
++// still surfaces in the log instead of being mistaken for a token. By default
++// an existing token is reused; forceNew mints a fresh one.
++func genToken(desc string, forceNew bool) {
++	if err := database.InitDB(config.GetDBPath()); err != nil {
++		fmt.Fprintln(os.Stderr, err)
++		os.Exit(1)
++	}
++	userService := service.UserService{}
++	user, err := userService.GetFirstUser()
++	if err != nil {
++		fmt.Fprintln(os.Stderr, "get user failed:", err)
++		os.Exit(1)
++	}
++	if desc == "" {
++		desc = "cli"
++	}
++	var token string
++	if forceNew {
++		token, err = userService.AddToken(user.Username, 0, desc)
++	} else {
++		token, err = userService.GetOrCreateToken(user.Username, desc)
++	}
++	if err != nil {
++		fmt.Fprintln(os.Stderr, "generate token failed:", err)
++		os.Exit(1)
++	}
++	fmt.Println(token)
++}
+diff -ruN
+--- a/config/config.go	2026-09-16 08:54:30.000000000 +0800
++++ b/config/config.go	2026-10-04 11:00:32.001674000 +0800
+@@ -28,6 +28,29 @@
+ 	return strings.TrimSpace(version)
+ }
+ 
++// PanelRepoDefault is used when nothing overrides it. Release CI rewrites this
++// to the publishing repository via -ldflags -X, so a release build always knows
++// where to fetch its own updates from without a code change.
++const PanelRepoDefault = "OWNER/REPO"
++
++// PanelRepo is the GitHub "owner/repo" this build checks for updates and pulls
++// install.sh from. Overridden at build time with
++//   -ldflags "-X github.com/alireza0/s-ui/config.PanelRepo=owner/repo"
++var PanelRepo = PanelRepoDefault
++
++// GetPanelRepo returns the effective owner/repo for update checks. The
++// environment variable wins so an operator can point an existing binary at a
++// mirror without rebuilding.
++func GetPanelRepo() string {
++	if env := strings.TrimSpace(os.Getenv("SUI_PANEL_REPO")); env != "" {
++		return env
++	}
++	if repo := strings.TrimSpace(PanelRepo); repo != "" {
++		return repo
++	}
++	return PanelRepoDefault
++}
++
+ func GetName() string {
+ 	return strings.TrimSpace(name)
+ }
+diff -ruN
+--- a/config/version	2026-09-16 08:54:30.000000000 +0800
++++ b/config/version	2026-10-04 15:04:35.223753200 +0800
+@@ -1 +1 @@
+-1.6.3
+\ No newline at end of file
++1.6.3-mo2
+diff -ruN
+--- a/database/model/server.go	1970-01-01 08:00:00.000000000 +0800
++++ b/database/model/server.go	2026-10-04 11:00:15.114743600 +0800
+@@ -0,0 +1,21 @@
++package model
++
++// Server is a saved panel address — a "launcher" entry pointing at another
++// panel (this fork, upstream s-ui, 3x-ui, anything).
++//
++// Two uses share one row:
++//   - Token empty: clicking the entry just opens Url in a new tab.
++//   - Token set: the central panel can manage that instance from this UI. The
++//     browser sends an X-Remote-Server header and the API layer forwards the
++//     request to <Url>/apiv2/<action> using Token.
++//
++// Named Server rather than something with "Panel" in it, because PanelService
++// already means "this running process" and ServerService already means "this
++// host's CPU/memory".
++type Server struct {
++	Id     uint   `json:"id" form:"id" gorm:"primaryKey;autoIncrement"`
++	Name   string `json:"name" form:"name"`
++	Url    string `json:"url" form:"url"`
++	Token  string `json:"token" form:"token"`
++	Remark string `json:"remark" form:"remark"`
++}
+diff -ruN
+--- a/database/schema.go	2026-09-16 08:54:30.000000000 +0800
++++ b/database/schema.go	2026-10-04 11:00:31.994690100 +0800
+@@ -31,6 +31,7 @@
+ 		{"stats", &model.Stats{}, copyRows[model.Stats]},
+ 		{"clients", &model.Client{}, copyRows[model.Client]},
+ 		{"changes", &model.Changes{}, copyRows[model.Changes]},
++		{"servers", &model.Server{}, copyRows[model.Server]},
+ 	}
+ }
+ 
+diff -ruN
+--- a/install.sh	2026-09-16 08:54:30.000000000 +0800
++++ b/install.sh	2026-10-04 14:12:53.693050700 +0800
+@@ -8,6 +8,65 @@
+ cur_dir=$(pwd)
+ 
+ #############################################
++# Distribution
++#
++# Everything this script fetches comes from the repository named here. It is
++# overridable so a mirror or a private fork needs no edit:
++#   SUI_REPO=owner/repo bash install.sh
++#############################################
++SUI_REPO="${SUI_REPO:-OWNER/REPO}"
++
++#############################################
++# Unattended mode
++#
++#   SUI_AUTO=1 bash install.sh
++#
++# Never prompts. On a fresh machine it generates a random admin account and
++# random panel/subscription paths; on an existing one it keeps every existing
++# setting. The panel's own "update" button runs this script with SUI_AUTO=1,
++# so the second rule is load bearing: if a Web-triggered update rewrote the
++# credentials, one click would lock the operator out of the panel.
++#############################################
++is_auto() {
++    case "${SUI_AUTO}" in
++    1 | true | TRUE | yes | Yes | on) return 0 ;;
++    *) return 1 ;;
++    esac
++}
++
++# gen_random_string [length] -- URL- and shell-safe random text.
++#
++# The obvious `head -c N /dev/urandom | base64` emits '/', '+' and a newline,
++# all of which have to be escaped the moment the value goes into a URL or is
++# echoed into a config. Filtering to the alphanumerics keeps it usable as a
++# path segment, a password and a command-line argument without further care.
++gen_random_string() {
++    tr -dc 'a-zA-Z0-9' </dev/urandom | head -c "${1:-8}"
++}
++
++# is_port_listening <port> -- true when something already accepts connections
++# on the loopback interface at that port.
++is_port_listening() {
++    (exec 3<>"/dev/tcp/127.0.0.1/$1") 2>/dev/null
++}
++
++# pick_port <preferred> -- the preferred port, or the next free one. A fresh
++# install on a box already running something on 2095 used to end with the panel
++# unable to bind and no explanation of why.
++pick_port() {
++    local port="${1:-2095}" tries=0
++    while [[ "${tries}" -lt 50 ]]; do
++        if ! is_port_listening "${port}"; then
++            echo "${port}"
++            return 0
++        fi
++        port=$((port + 1))
++        tries=$((tries + 1))
++    done
++    echo "${port}"
++}
++
++#############################################
+ # Localization
+ #
+ # The installer speaks the six languages of the panel UI:
+@@ -279,6 +338,37 @@
+ d zhtw access_panel "您可以透過以下 URL 存取面板："
+ d zhtw executing "正在執行..."
+ 
++#############################################
++# Messages for the features added on top of upstream: unattended install and
++# purge. `t` already falls back to English, so the other four languages keep
++# working without a translation.
++#############################################
++d en auto_mode "Unattended mode: nothing will be asked."
++d en auto_summary "Generated settings -- save these now, they are shown only once"
++d en panel_port "Panel port"
++d en panel_path "Panel path"
++d en sub_port "Subscription port"
++d en sub_path "Subscription path"
++d en username "Username"
++d en password "Password"
++d en purging "Removing s-ui..."
++d en purge_done "s-ui removed. Nothing of it is left on this machine."
++d en uninstall_warn "This removes the s-ui program and its service."
++d en uninstall_keep_db "s-ui removed. The database under /etc/s-ui was kept; run 'install.sh purge' to delete that too."
++
++d zhcn auto_mode "自动模式：全程不再询问。"
++d zhcn auto_summary "已生成以下设置 —— 请立即保存，只显示这一次"
++d zhcn panel_port "面板端口"
++d zhcn panel_path "面板路径"
++d zhcn sub_port "订阅端口"
++d zhcn sub_path "订阅路径"
++d zhcn username "账号"
++d zhcn password "密码"
++d zhcn purging "正在卸载 s-ui..."
++d zhcn purge_done "s-ui 已彻底清除，本机不留任何残留。"
++d zhcn uninstall_warn "将删除 s-ui 程序与其服务。"
++d zhcn uninstall_keep_db "s-ui 已卸载，/etc/s-ui 下的数据库保留；如需一并删除请执行 install.sh purge。"
++
+ # t <key> — return the localized message, falling back to English.
+ t() {
+     local var="MSG_${lang}_$1"
+@@ -385,6 +475,11 @@
+     echo -e "${yellow}$(t migrating)${plain}"
+     /usr/local/s-ui/sui migrate
+ 
++    if is_auto; then
++        auto_config
++        return
++    fi
++
+     echo -e "${yellow}$(t finished_modify)${plain}"
+     read -r -p "$(t ask_modify)" config_confirm
+     if [[ "${config_confirm}" == "y" || "${config_confirm}" == "Y" ]]; then
+@@ -455,6 +550,90 @@
+     fi
+ }
+ 
++# auto_config writes settings for an unattended install.
++#
++# On an existing installation it deliberately does nothing but report: the
++# database is the operator's, and this path is also the one the panel's Web
++# update button drives. Generating an account here would hand the panel a new
++# password the operator never sees.
++auto_config() {
++    if [[ -f "/usr/local/s-ui/db/s-ui.db" ]]; then
++        echo -e "${green}$(t upgrade_keep)${plain}"
++        /usr/local/s-ui/sui admin -show
++        return 0
++    fi
++
++    local p_port p_path p_subport p_subpath p_user p_pass
++    p_port="${SUI_PORT:-$(pick_port 2095)}"
++    p_subport="${SUI_SUB_PORT:-$(pick_port 2096)}"
++    p_path="${SUI_PATH:-/$(gen_random_string 8)/}"
++    p_subpath="${SUI_SUB_PATH:-/$(gen_random_string 8)/}"
++    p_user="${SUI_USER:-ad$(gen_random_string 6)}"
++    p_pass="${SUI_PASSWORD:-$(gen_random_string 16)}"
++
++    echo -e "${yellow}$(t initializing)${plain}"
++    if ! /usr/local/s-ui/sui setting -port "${p_port}" -path "${p_path}" \
++        -subPort "${p_subport}" -subPath "${p_subpath}"; then
++        echo -e "${red}$(t creds_failed)${plain}"
++        exit 1
++    fi
++    if ! /usr/local/s-ui/sui admin -username "${p_user}" -password "${p_pass}"; then
++        echo -e "${red}$(t creds_failed)${plain}"
++        exit 1
++    fi
++
++    echo
++    echo -e "${green}###############################################${plain}"
++    echo -e "${green} $(t auto_summary)${plain}"
++    echo -e "${green}###############################################${plain}"
++    echo -e "${green} $(t panel_port) : ${plain}${p_port}"
++    echo -e "${green} $(t panel_path) : ${plain}${p_path}"
++    echo -e "${green} $(t sub_port)   : ${plain}${p_subport}"
++    echo -e "${green} $(t sub_path)   : ${plain}${p_subpath}"
++    echo -e "${green} $(t username)   : ${plain}${p_user}"
++    echo -e "${green} $(t password)   : ${plain}${p_pass}"
++    echo -e "${green}###############################################${plain}"
++    echo
++}
++
++stop_service() {
++    if [[ "${init_system}" == "systemd" ]] && command -v systemctl >/dev/null 2>&1; then
++        systemctl stop s-ui 2>/dev/null
++        systemctl disable s-ui 2>/dev/null
++        rm -f /etc/systemd/system/s-ui.service
++        systemctl daemon-reload 2>/dev/null
++        systemctl reset-failed 2>/dev/null
++    elif [[ "${init_system}" == "openrc" ]] && command -v rc-service >/dev/null 2>&1; then
++        rc-service s-ui stop 2>/dev/null
++        rc-update del s-ui default 2>/dev/null
++        rm -f /etc/init.d/s-ui
++    fi
++}
++
++# uninstall_s-ui removes the program and the service, and leaves the database
++# alone. Nothing is checked first: a half-finished install leaves the panel in a
++# state where "is it installed" is false, and gating removal on that test makes
++# the leftovers impossible to clean and a reinstall impossible to start.
++uninstall_s-ui() {
++    echo -e "${yellow}$(t uninstall_warn)${plain}"
++    stop_service
++    rm -rf /usr/local/s-ui
++    rm -f /usr/bin/s-ui
++    echo -e "${green}$(t uninstall_keep_db)${plain}"
++}
++
++# purge_s-ui removes everything, including /etc/s-ui. It depends on nothing but
++# being root, so it works on a machine where /usr/bin/s-ui is already gone --
++# which is exactly the machine that needs it.
++purge_s-ui() {
++    echo -e "${yellow}$(t purging)${plain}"
++    stop_service
++    rm -rf /usr/local/s-ui
++    rm -rf /etc/s-ui
++    rm -f /usr/bin/s-ui
++    echo -e "${green}$(t purge_done)${plain}"
++}
++
+ prepare_services() {
+     if [[ "${init_system}" == "systemd" ]]; then
+         if [[ -f "/etc/systemd/system/sing-box.service" ]]; then
+@@ -516,7 +695,7 @@
+     local sums="$workdir/SHA256SUMS"
+ 
+     if [ $# == 0 ]; then
+-        last_version=$(curl -Ls "https://api.github.com/repos/alireza0/s-ui/releases/latest" | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/')
++        last_version=$(curl -Ls "https://api.github.com/repos/${SUI_REPO}/releases/latest" | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/')
+         if [[ ! -n "$last_version" ]]; then
+             echo -e "${red}$(t fetch_fail)${plain}"
+             exit 1
+@@ -530,7 +709,7 @@
+     # No --no-check-certificate. It was on every download here, which turns the
+     # whole install into an unauthenticated fetch: anyone able to intercept it
+     # chooses the binary that then runs as root.
+-    local base="https://github.com/alireza0/s-ui/releases/download/${last_version}"
++    local base="https://github.com/${SUI_REPO}/releases/download/${last_version}"
+     if ! wget -q --show-progress -O "$archive" "${base}/s-ui-linux-$(arch).tar.gz"; then
+         if [ $# == 0 ]; then
+             echo -e "${red}$(t download_fail)${plain}"
+@@ -587,7 +766,10 @@
+         systemctl enable s-ui --now
+     fi
+ 
+-    printf "${green}s-ui v${last_version}${plain} $(t install_finished)\n"
++    # No "v" here: the release tag already carries one (v1.6.3-mo1), and the
++    # upstream line hardcoded an extra literal "v" in front of it, so every
++    # install announced "s-ui vv1.6.3-mo1".
++    printf "${green}s-ui ${last_version}${plain} $(t install_finished)\n"
+     echo -e "$(t access_panel)${green}"
+     /usr/local/s-ui/sui uri
+     echo -e "${plain}"
+@@ -595,6 +777,23 @@
+     s-ui help
+ }
+ 
++# Subcommands, handled before anything is installed or downloaded.
++#   install.sh purge      -- delete s-ui and its data, nothing needs to exist
++#   install.sh uninstall  -- delete the program and service, keep the database
++case "${1:-}" in
++purge)
++    purge_s-ui
++    exit 0
++    ;;
++uninstall)
++    uninstall_s-ui
++    exit 0
++    ;;
++esac
++
+ echo -e "${green}$(t executing)${plain}"
++if is_auto; then
++    echo -e "${green}$(t auto_mode)${plain}"
++fi
+ install_base
+ install_s-ui $1
+diff -ruN
+--- a/s-ui.sh	2026-09-16 08:54:30.000000000 +0800
++++ b/s-ui.sh	2026-10-04 11:10:19.431114200 +0800
+@@ -17,6 +17,27 @@
+     echo -e "${green}[INF] $* ${plain}"
+ }
+ 
++# Everything this menu fetches -- the installer and the copy of itself it
++# upgrades to -- comes from here. Overridable without editing the file:
++#   SUI_REPO=owner/repo s-ui update
++SUI_REPO="${SUI_REPO:-OWNER/REPO}"
++
++# stop_service removes the service definition and stops it, on either init
++# system. Used by uninstall and purge so the two cannot drift apart.
++stop_service() {
++    if [[ "${init_system}" == "openrc" ]]; then
++        rc-service s-ui stop 2>/dev/null
++        rc-update del s-ui default 2>/dev/null
++        rm -f /etc/init.d/s-ui
++    else
++        systemctl stop s-ui 2>/dev/null
++        systemctl disable s-ui 2>/dev/null
++        rm -f /etc/systemd/system/s-ui.service
++        systemctl daemon-reload 2>/dev/null
++        systemctl reset-failed 2>/dev/null
++    fi
++}
++
+ [[ $EUID -ne 0 ]] && LOGE "ERROR: You must be root to run this script! \n" && exit 1
+ 
+ if [[ -f /etc/os-release ]]; then
+@@ -83,7 +104,7 @@
+ }
+ 
+ install() {
+-    bash <(curl -Ls https://raw.githubusercontent.com/alireza0/s-ui/main/install.sh)
++    bash <(curl -Ls https://raw.githubusercontent.com/${SUI_REPO}/main/install.sh)
+     if [[ $? == 0 ]]; then
+         if [[ $# == 0 ]]; then
+             start
+@@ -102,7 +123,7 @@
+         fi
+         return 0
+     fi
+-    bash <(curl -Ls https://raw.githubusercontent.com/alireza0/s-ui/main/install.sh)
++    bash <(curl -Ls https://raw.githubusercontent.com/${SUI_REPO}/main/install.sh)
+     if [[ $? == 0 ]]; then
+         LOGI "Update is complete, Panel has automatically restarted "
+         exit 0
+@@ -118,7 +139,7 @@
+     exit 1
+     fi
+ 
+-    download_link="https://raw.githubusercontent.com/alireza0/s-ui/main/install.sh"
++    download_link="https://raw.githubusercontent.com/${SUI_REPO}/main/install.sh"
+ 
+     install_command="bash <(curl -Ls $download_link) $panel_version"
+ 
+@@ -126,30 +147,55 @@
+     eval $install_command
+ }
+ 
++# uninstall removes the program and the service but keeps /etc/s-ui, which holds
++# the database. Reinstalling therefore brings the panel back as it was.
++#
++# It deliberately checks nothing first. The old flow was "check_install &&
++# uninstall", so on a machine whose install had failed halfway -- the one case
++# where removal actually matters -- the check said "not installed" and both the
++# leftovers and a reinstall were blocked.
+ uninstall() {
+-    confirm "Are you sure you want to uninstall the panel?" "n"
+-    if [[ $? != 0 ]]; then
+-        if [[ $# == 0 ]]; then
++    if [[ $# == 0 ]]; then
++        confirm "Are you sure you want to uninstall the panel?" "n"
++        if [[ $? != 0 ]]; then
+             show_menu
++            return 0
+         fi
+-        return 0
+     fi
+-    if [[ "${init_system}" == "openrc" ]]; then
+-        rc-service s-ui stop
+-        rc-update del s-ui default
+-        rm /etc/init.d/s-ui -f
+-    else
+-        systemctl stop s-ui
+-        systemctl disable s-ui
+-        rm /etc/systemd/system/s-ui.service -f
+-        systemctl daemon-reload
+-        systemctl reset-failed
++
++    stop_service
++    rm -rf /usr/local/s-ui
++    rm -f /usr/bin/s-ui
++
++    echo ""
++    echo -e "Uninstalled. The database under ${green}/etc/s-ui${plain} was kept, so reinstalling restores the panel as it was."
++    echo -e "To delete that too, run ${green}s-ui purge${plain}."
++    echo ""
++
++    if [[ $# == 0 ]]; then
++        before_show_menu
++    fi
++}
++
++# purge removes everything, database included. Also checks nothing first, for
++# the same reason as uninstall.
++purge() {
++    if [[ $# == 0 ]]; then
++        echo -e "${red}This deletes the panel AND its database (/etc/s-ui). It cannot be undone.${plain}"
++        confirm "Continue with a full purge?" "n"
++        if [[ $? != 0 ]]; then
++            show_menu
++            return 0
++        fi
+     fi
+-    rm /etc/s-ui/ -rf
+-    rm /usr/local/s-ui/ -rf
++
++    stop_service
++    rm -rf /usr/local/s-ui
++    rm -rf /etc/s-ui
++    rm -f /usr/bin/s-ui
+ 
+     echo ""
+-    echo -e "Uninstalled Successfully, If you want to remove this script, then after exiting the script run ${green}rm /usr/local/s-ui -f${plain} to delete it."
++    echo -e "Purged. ${green}Nothing${plain} of s-ui is left on this machine."
+     echo ""
+ 
+     if [[ $# == 0 ]]; then
+@@ -323,7 +369,7 @@
+ update_shell() {
+     # Certificate verification stays on: this file is about to be installed as
+     # /usr/bin/s-ui and run as root.
+-    wget -O /usr/bin/s-ui -N https://github.com/alireza0/s-ui/raw/main/s-ui.sh
++    wget -O /usr/bin/s-ui -N https://github.com/${SUI_REPO}/raw/main/s-ui.sh
+     if [[ $? != 0 ]]; then
+         echo ""
+         LOGE "Failed to download script, Please check whether the machine can connect Github"
+@@ -895,7 +941,9 @@
+     echo -e "s-ui log          - Check s-ui Logs"
+     echo -e "s-ui update       - Update"
+     echo -e "s-ui install      - Install"
+-    echo -e "s-ui uninstall    - Uninstall"
++    echo -e "s-ui uninstall    - Uninstall (keeps the database)"
++    echo -e "s-ui purge        - Uninstall and delete the database"
++    echo -e "s-ui token        - Print an APIv2 token for the first admin"
+     echo -e "s-ui help         - Control Menu Usage"
+     echo -e "------------------------------------------"
+ }
+@@ -931,9 +979,11 @@
+   ${green}19.${plain} SSL Certificate Management
+   ${green}20.${plain} Cloudflare SSL Certificate
+ ————————————————————————————————
++  ${green}21.${plain} Purge (remove panel and database)
++————————————————————————————————
+  "
+     show_status s-ui
+-    echo && read -p "Please enter your selection [0-20]: " num
++    echo && read -p "Please enter your selection [0-21]: " num
+ 
+     case "${num}" in
+     0)
+@@ -949,7 +999,7 @@
+         check_install && custom_version
+         ;;
+     4)
+-        check_install && uninstall
++        uninstall
+         ;;
+     5)
+         check_install && reset_admin
+@@ -999,8 +1049,11 @@
+     20)
+         ssl_cert_issue_CF
+         ;;
++    21)
++        purge
++        ;;
+     *)
+-        LOGE "Please enter the correct number [0-20]"
++        LOGE "Please enter the correct number [0-21]"
+         ;;
+     esac
+ }
+@@ -1035,7 +1088,15 @@
+         check_uninstall 0 && install 0
+         ;;
+     "uninstall")
+-        check_install 0 && uninstall 0
++        uninstall 0
++        ;;
++    "purge")
++        purge 0
++        ;;
++    "token")
++        # Thin wrapper so the token command is reachable from the menu script
++        # too; the binary is the real implementation.
++        check_install 0 && /usr/local/s-ui/sui token
+         ;;
+     *) show_usage ;;
+     esac
+diff -ruN
+--- a/service/config.go	2026-09-16 08:54:30.000000000 +0800
++++ b/service/config.go	2026-10-04 11:00:44.421676200 +0800
+@@ -35,6 +35,7 @@
+ 	OutboundService
+ 	ServicesService
+ 	EndpointService
++	ServerListService
+ }
+ 
+ // SingBoxConfig is the shape GetConfig decodes the stored base config into
+@@ -437,6 +438,11 @@
+ 		err = s.ServicesService.Save(tx, act, data)
+ 	case "endpoints":
+ 		err = s.EndpointService.Save(tx, act, data)
++	case "servers":
++		// Saved panel addresses. Nothing here reaches the core, so this case
++		// deliberately sets no objs beyond the object itself and never marks
++		// the config for a restart -- a panel list edit must not bounce sing-box.
++		err = s.ServerListService.Save(tx, act, data)
+ 	case "config":
+ 		err = s.SettingService.SaveConfig(tx, data)
+ 		if err != nil {
+diff -ruN
+--- a/service/panel.go	2026-09-16 08:54:30.000000000 +0800
++++ b/service/panel.go	2026-10-04 13:05:06.766444700 +0800
+@@ -1,11 +1,19 @@
+ package service
+ 
+ import (
++	"encoding/json"
++	"fmt"
++	"io"
++	"net/http"
+ 	"os"
++	"os/exec"
+ 	"runtime"
++	"strconv"
++	"strings"
+ 	"syscall"
+ 	"time"
+ 
++	"github.com/alireza0/s-ui/config"
+ 	"github.com/alireza0/s-ui/logger"
+ )
+ 
+@@ -30,3 +38,243 @@
+ 	}()
+ 	return nil
+ }
++
++// PanelUpdateInfo is the answer to "is there a newer build of this panel".
++type PanelUpdateInfo struct {
++	CurrentVersion  string `json:"currentVersion"`
++	LatestVersion   string `json:"latestVersion"`
++	UpdateAvailable bool   `json:"updateAvailable"`
++	Repo            string `json:"repo"`
++}
++
++const (
++	// There is no separate update.sh: upgrading is re-running install.sh.
++	// That is safe because the installer only mints a random account, password
++	// and panel path when db/s-ui.db does not exist yet. An existing install
++	// takes the "keep current settings" branch, so a click in the Web UI can
++	// never lock the operator out of their own panel. The SUI_AUTO branch added
++	// for this feature preserves the same rule.
++	maxPanelUpdaterBytes = 2 << 20
++)
++
++func panelUpdaterURL(repo string) string {
++	return fmt.Sprintf("https://raw.githubusercontent.com/%s/main/install.sh", repo)
++}
++
++func panelReleaseAPI(repo string) string {
++	return fmt.Sprintf("https://api.github.com/repos/%s/releases/latest", repo)
++}
++
++// GetUpdateInfo asks GitHub for the newest release of the tracked repository
++// and compares it with the version this binary was built from.
++func (s *PanelService) GetUpdateInfo() (*PanelUpdateInfo, error) {
++	repo := config.GetPanelRepo()
++	if repo == "" || repo == config.PanelRepoDefault {
++		return nil, fmt.Errorf("panel repository is not configured; set SUI_PANEL_REPO or build with -X config.PanelRepo=owner/repo")
++	}
++	latest, err := fetchLatestPanelVersion(repo)
++	if err != nil {
++		return nil, err
++	}
++	current := config.GetVersion()
++	return &PanelUpdateInfo{
++		CurrentVersion:  current,
++		LatestVersion:   latest,
++		UpdateAvailable: isNewerVersion(latest, current),
++		Repo:            repo,
++	}, nil
++}
++
++// StartUpdate launches the upgrade outside the current request.
++//
++// The hard part is outliving the process being replaced. install.sh restarts
++// s-ui at the end; if the updater were a child of the panel it would be killed
++// along with it mid-install, leaving a half-written tree behind. So the job is
++// started as its own systemd unit where systemd is available, and otherwise
++// detached from the process group with setsid (containers, no-systemd boxes).
++func (s *PanelService) StartUpdate() error {
++	if runtime.GOOS != "linux" {
++		return fmt.Errorf("panel web update is supported only on Linux installations")
++	}
++	repo := config.GetPanelRepo()
++	if repo == "" || repo == config.PanelRepoDefault {
++		return fmt.Errorf("panel repository is not configured; set SUI_PANEL_REPO or build with -X config.PanelRepo=owner/repo")
++	}
++
++	bash, err := exec.LookPath("bash")
++	if err != nil {
++		return fmt.Errorf("bash is required to run the panel updater: %w", err)
++	}
++
++	scriptPath, err := downloadPanelUpdater(repo)
++	if err != nil {
++		return err
++	}
++
++	// Delete the temporary script on the way out, success or failure.
++	// SUI_AUTO=1 keeps the whole run non-interactive.
++	updateScript := fmt.Sprintf("set -e; trap 'rm -f %s' EXIT; SUI_AUTO=1 %s %s",
++		shellQuote(scriptPath), shellQuote(bash), shellQuote(scriptPath))
++
++	if systemdRun, err := exec.LookPath("systemd-run"); err == nil {
++		unitName := fmt.Sprintf("s-ui-web-update-%d", time.Now().Unix())
++		cmd := exec.Command(systemdRun, "--unit", unitName, bash, "-lc", updateScript)
++		out, err := cmd.CombinedOutput()
++		if err != nil {
++			output := strings.TrimSpace(string(out))
++			// Not being under systemd is not an error -- it is a container or a
++			// minimal image. Fall through to setsid; anything else is real.
++			if !strings.Contains(output, "System has not been booted with systemd") &&
++				!strings.Contains(output, "Failed to connect to bus") {
++				_ = os.Remove(scriptPath)
++				return fmt.Errorf("failed to start panel update job: %w: %s", err, output)
++			}
++			logger.Warning("systemd-run unavailable, falling back to detached update process: ", output)
++		} else {
++			logger.Info("started panel update job via systemd-run unit ", unitName)
++			return nil
++		}
++	}
++
++	cmd := exec.Command(bash, "-lc", "setsid "+updateScript+" >/dev/null 2>&1 </dev/null &")
++	if err := cmd.Start(); err != nil {
++		_ = os.Remove(scriptPath)
++		return fmt.Errorf("failed to start panel update job: %w", err)
++	}
++	if err := cmd.Process.Release(); err != nil {
++		logger.Warning("failed to release panel update process: ", err)
++	}
++	logger.Info("started detached panel update job")
++	return nil
++}
++
++func downloadPanelUpdater(repo string) (string, error) {
++	client := &http.Client{Timeout: 15 * time.Second}
++	resp, err := client.Get(panelUpdaterURL(repo))
++	if err != nil {
++		return "", fmt.Errorf("download panel updater: %w", err)
++	}
++	defer resp.Body.Close()
++	if resp.StatusCode != http.StatusOK {
++		return "", fmt.Errorf("download panel updater: unexpected HTTP %d", resp.StatusCode)
++	}
++
++	file, err := os.CreateTemp("", "s-ui-update-*.sh")
++	if err != nil {
++		return "", err
++	}
++	path := file.Name()
++	ok := false
++	defer func() {
++		_ = file.Close()
++		if !ok {
++			_ = os.Remove(path)
++		}
++	}()
++
++	// Capped, so a hijacked or wildly wrong response cannot fill the disk.
++	n, err := io.Copy(file, io.LimitReader(resp.Body, maxPanelUpdaterBytes+1))
++	if err != nil {
++		return "", fmt.Errorf("write panel updater: %w", err)
++	}
++	if n > maxPanelUpdaterBytes {
++		return "", fmt.Errorf("panel updater exceeds %d bytes", maxPanelUpdaterBytes)
++	}
++	if err := file.Chmod(0700); err != nil {
++		return "", err
++	}
++	ok = true
++	return path, nil
++}
++
++func fetchLatestPanelVersion(repo string) (string, error) {
++	client := &http.Client{Timeout: 10 * time.Second}
++	resp, err := client.Get(panelReleaseAPI(repo))
++	if err != nil {
++		return "", err
++	}
++	defer resp.Body.Close()
++	if resp.StatusCode != http.StatusOK {
++		return "", fmt.Errorf("GitHub API returned status %d", resp.StatusCode)
++	}
++	var release struct {
++		TagName string `json:"tag_name"`
++	}
++	if err := json.NewDecoder(resp.Body).Decode(&release); err != nil {
++		return "", err
++	}
++	if release.TagName == "" {
++		return "", fmt.Errorf("latest panel release tag is empty")
++	}
++	return release.TagName, nil
++}
++
++// Versions look like 1.6.3-mo1: three upstream numbers plus a fork suffix that
++// CI derives from the tag. Compare the numbers first and only then the fork
++// counter -- comparing the raw strings would leave "update available" lit
++// forever whenever the local build carries a suffix and the release does not,
++// or the moment the counter reaches double digits ("mo9" > "mo10" as text).
++func isNewerVersion(latest, current string) bool {
++	lMain, lRank, lNum, lOk := parseSuiVersion(latest)
++	cMain, cRank, cNum, cOk := parseSuiVersion(current)
++	if !lOk || !cOk {
++		return normalizeVersionTag(latest) != normalizeVersionTag(current)
++	}
++	for i := range lMain {
++		if lMain[i] != cMain[i] {
++			return lMain[i] > cMain[i]
++		}
++	}
++	// Same upstream version: a fork suffix outranks a bare release, because a
++	// bare "1.6.3" is plain upstream and any suffix is a build on top of it.
++	if lRank != cRank {
++		return lRank > cRank
++	}
++	return lNum > cNum
++}
++
++// parseSuiVersion splits 1.6.3-mo12 into [1,6,3], a rank that is 0 for a bare
++// upstream version and 1 for anything with a suffix, and the counter 12. ok is
++// false when the three leading numbers are not all numeric.
++func parseSuiVersion(version string) ([3]int, int, int, bool) {
++	var main [3]int
++	v := normalizeVersionTag(version)
++	num := 0
++	rank := 0
++	if idx := strings.IndexAny(v, "-+"); idx >= 0 {
++		suffix := v[idx+1:]
++		v = v[:idx]
++		if suffix != "" {
++			rank = 1
++			i := len(suffix)
++			for i > 0 && suffix[i-1] >= '0' && suffix[i-1] <= '9' {
++				i--
++			}
++			if n, err := strconv.Atoi(suffix[i:]); err == nil {
++				num = n
++			}
++		}
++	}
++	parts := strings.Split(v, ".")
++	if len(parts) != 3 {
++		return main, 0, 0, false
++	}
++	for i, p := range parts {
++		n, err := strconv.Atoi(p)
++		if err != nil {
++			return main, 0, 0, false
++		}
++		main[i] = n
++	}
++	return main, rank, num, true
++}
++
++func normalizeVersionTag(version string) string {
++	return strings.TrimPrefix(strings.TrimSpace(version), "v")
++}
++
++// shellQuote wraps a value for safe interpolation into the shell command line
++// that launches the updater.
++func shellQuote(value string) string {
++	return "'" + strings.ReplaceAll(value, "'", `'\''`) + "'"
++}
+diff -ruN
+--- a/service/serverlist.go	1970-01-01 08:00:00.000000000 +0800
++++ b/service/serverlist.go	2026-10-04 11:00:15.343313700 +0800
+@@ -0,0 +1,58 @@
++package service
++
++import (
++	"encoding/json"
++
++	"github.com/alireza0/s-ui/database"
++	"github.com/alireza0/s-ui/database/model"
++	"github.com/alireza0/s-ui/util/common"
++
++	"gorm.io/gorm"
++)
++
++// ServerListService manages the saved panel addresses — the "server launcher".
++//
++// Note the deliberate name: ServerService (service/server.go) reports this
++// host's system info (CPU, memory, core status). This one is a plain CRUD over
++// the servers table. Merging them would have made the panel's own metrics and
++// the list of remote panels look like the same concept.
++type ServerListService struct{}
++
++func (s *ServerListService) GetAll() ([]model.Server, error) {
++	db := database.GetDB()
++	var servers []model.Server
++	err := db.Model(model.Server{}).Find(&servers).Error
++	if err != nil {
++		return nil, err
++	}
++	return servers, nil
++}
++
++func (s *ServerListService) GetById(id string) (*model.Server, error) {
++	db := database.GetDB()
++	var server model.Server
++	err := db.Model(model.Server{}).Where("id = ?", id).First(&server).Error
++	if err != nil {
++		return nil, err
++	}
++	return &server, nil
++}
++
++func (s *ServerListService) Save(tx *gorm.DB, act string, data json.RawMessage) error {
++	switch act {
++	case "new", "edit":
++		var server model.Server
++		if err := json.Unmarshal(data, &server); err != nil {
++			return err
++		}
++		return tx.Save(&server).Error
++	case "del":
++		var id uint
++		if err := json.Unmarshal(data, &id); err != nil {
++			return err
++		}
++		return tx.Where("id = ?", id).Delete(model.Server{}).Error
++	default:
++		return common.NewErrorf("unknown action: %s", act)
++	}
++}
+diff -ruN
+--- a/service/user.go	2026-09-16 08:54:30.000000000 +0800
++++ b/service/user.go	2026-10-04 11:01:51.936244000 +0800
+@@ -217,6 +217,27 @@
+ // DeleteToken removes one of the caller's own API tokens. The owner check is
+ // the point: the id came from the form with no constraint, so any logged-in
+ // user could revoke any other user's tokens by counting upwards.
++// GetOrCreateToken returns an existing non-expired token for the user, or
++// mints one. Provisioning scripts call this on every boot; handing out a fresh
++// token each time would leave a growing pile of live credentials in the
++// database that nobody ever revokes.
++func (s *UserService) GetOrCreateToken(username string, desc string) (string, error) {
++	db := database.GetDB()
++	var existing model.Tokens
++	err := db.Model(model.Tokens{}).
++		Where("user_id = (select id from users where username = ?)", username).
++		Where("expiry = 0 or expiry > ?", time.Now().Unix()).
++		Order("id asc").
++		First(&existing).Error
++	if err == nil && existing.Token != "" {
++		return existing.Token, nil
++	}
++	if err != nil && !database.IsNotFound(err) {
++		return "", err
++	}
++	return s.AddToken(username, 0, desc)
++}
++
+ func (s *UserService) DeleteToken(loginUser string, id string) error {
+ 	if loginUser == "" {
+ 		return common.NewError("not logged in")
+diff -ruN
+--- a/setrepo.sh	1970-01-01 08:00:00.000000000 +0800
++++ b/setrepo.sh	2026-10-04 11:11:43.863329500 +0800
+@@ -0,0 +1,40 @@
++#!/bin/bash
++# Point this checkout at the repository that will publish it.
++#
++# The updater, the installer and the menu script all need to know where their
++# own releases live. Rather than a build-time substitution that only works in
++# CI, every one of those places reads a SUI_REPO variable whose default is the
++# placeholder below -- this rewrites the defaults so a plain release build is
++# already self-hosting.
++#
++#   ./setrepo.sh yourname/s-ui-mo
++set -euo pipefail
++
++if [[ $# -ne 1 ]]; then
++    echo "usage: $0 <owner/repo>" >&2
++    exit 1
++fi
++
++repo="$1"
++if [[ ! "$repo" =~ ^[A-Za-z0-9._-]+/[A-Za-z0-9._-]+$ ]]; then
++    echo "error: '$repo' is not an owner/repo pair" >&2
++    exit 1
++fi
++
++cd "$(dirname "$0")"
++count=0
++for f in install.sh s-ui.sh service/panel.go config/config.go; do
++    [[ -f "$f" ]] || continue
++    before=$(grep -c 'OWNER/REPO' "$f" || true)
++    [[ "$before" -gt 0 ]] || continue
++    sed -i.bak "s|OWNER/REPO|${repo}|g" "$f"
++    rm -f "$f.bak"
++    count=$((count + before))
++    echo "  $f  ($before)"
++done
++
++echo "pointed $count reference(s) at ${repo}"
++case "$repo" in
++*/s-ui-mo | */s-ui) ;;
++*) echo "note: install.sh and the updater assume the default branch is 'main' and the script is at its root." ;;
++esac
+diff -ruN
+--- a/util/shadowsocks.go	2026-09-16 08:54:30.000000000 +0800
++++ b/util/shadowsocks.go	2026-10-04 11:00:31.997685700 +0800
+@@ -4,6 +4,8 @@
+ 	switch method {
+ 	case "2022-blake3-aes-128-gcm":
+ 		return "shadowsocks16"
++	case "2022-blake3-aes-256-gcm", "2022-blake3-chacha20-poly1305":
++		return "shadowsocks32"
+ 	default:
+ 		return "shadowsocks"
+ 	}
