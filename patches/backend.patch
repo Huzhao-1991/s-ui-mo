@@ -1086,14 +1086,20 @@ diff -ruN
 +}
 diff -ruN
 --- a/config/config.go	2026-09-16 08:54:30.000000000 +0800
-+++ b/config/config.go	2026-10-04 16:29:09.736805000 +0800
-@@ -28,6 +28,29 @@
++++ b/config/config.go	2026-10-04 16:39:34.078505000 +0800
+@@ -28,6 +28,46 @@
  	return strings.TrimSpace(version)
  }
  
-+// PanelRepoDefault is used when nothing overrides it. Release CI rewrites this
-+// to the publishing repository via -ldflags -X, so a release build always knows
-+// where to fetch its own updates from without a code change.
++// PanelRepoPlaceholder marks a checkout that was never pointed at a real
++// repository. setrepo.sh replaces every occurrence of it, so meeting this value
++// at runtime means the panel has no idea where its own releases live.
++const PanelRepoPlaceholder = "OWNER/REPO"
++
++// PanelRepoDefault is the repository this build publishes itself to. setrepo.sh
++// rewrites it to the fork you are releasing from, and release CI overrides it at
++// link time with -X, so a release build always knows where to fetch its own
++// updates from without a code change.
 +const PanelRepoDefault = "Huzhao-1991/s-ui-mo"
 +
 +// PanelRepo is the GitHub "owner/repo" this build checks for updates and pulls
@@ -1112,6 +1118,17 @@ diff -ruN
 +		return repo
 +	}
 +	return PanelRepoDefault
++}
++
++// PanelRepoConfigured reports whether the effective repository is a real one.
++//
++// The check must be against PanelRepoPlaceholder, never against
++// PanelRepoDefault: once setrepo.sh has run, the default *is* the real
++// repository, so comparing with it would report every properly configured
++// build as unconfigured and disable the panel's self-update.
++func PanelRepoConfigured() bool {
++	repo := GetPanelRepo()
++	return repo != "" && repo != PanelRepoPlaceholder
 +}
 +
  func GetName() string {
@@ -1652,7 +1669,7 @@ diff -ruN
  		if err != nil {
 diff -ruN
 --- a/service/panel.go	2026-09-16 08:54:30.000000000 +0800
-+++ b/service/panel.go	2026-10-04 13:05:06.766444700 +0800
++++ b/service/panel.go	2026-10-04 16:39:42.283796100 +0800
 @@ -1,11 +1,19 @@
  package service
  
@@ -1708,8 +1725,8 @@ diff -ruN
 +// and compares it with the version this binary was built from.
 +func (s *PanelService) GetUpdateInfo() (*PanelUpdateInfo, error) {
 +	repo := config.GetPanelRepo()
-+	if repo == "" || repo == config.PanelRepoDefault {
-+		return nil, fmt.Errorf("panel repository is not configured; set SUI_PANEL_REPO or build with -X config.PanelRepo=owner/repo")
++	if !config.PanelRepoConfigured() {
++		return nil, fmt.Errorf("panel repository is not configured; run ./setrepo.sh owner/repo, or set SUI_PANEL_REPO, or build with -X config.PanelRepo=owner/repo")
 +	}
 +	latest, err := fetchLatestPanelVersion(repo)
 +	if err != nil {
@@ -1736,8 +1753,8 @@ diff -ruN
 +		return fmt.Errorf("panel web update is supported only on Linux installations")
 +	}
 +	repo := config.GetPanelRepo()
-+	if repo == "" || repo == config.PanelRepoDefault {
-+		return fmt.Errorf("panel repository is not configured; set SUI_PANEL_REPO or build with -X config.PanelRepo=owner/repo")
++	if !config.PanelRepoConfigured() {
++		return fmt.Errorf("panel repository is not configured; run ./setrepo.sh owner/repo, or set SUI_PANEL_REPO, or build with -X config.PanelRepo=owner/repo")
 +	}
 +
 +	bash, err := exec.LookPath("bash")
