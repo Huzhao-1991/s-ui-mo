@@ -23,7 +23,10 @@ fi
 
 cd "$(dirname "$0")"
 count=0
-for f in install.sh s-ui.sh service/panel.go config/config.go; do
+# build-release.sh 必须在这个列表里：它把 PANEL_REPO 通过
+# -X .../config.PanelRepo 注入二进制，默认值同样是 OWNER/REPO。
+# 漏掉它的话，改完 config/config.go 的默认值也会在构建时被重新覆盖成占位符。
+for f in install.sh s-ui.sh service/panel.go config/config.go build-release.sh Dockerfile; do
     [[ -f "$f" ]] || continue
     before=$(grep -c 'OWNER/REPO' "$f" || true)
     [[ "$before" -gt 0 ]] || continue

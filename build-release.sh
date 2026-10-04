@@ -27,7 +27,7 @@ set -eu
 
 cd "$(dirname "$0")"
 
-PANEL_REPO="${PANEL_REPO:-OWNER/REPO}"
+PANEL_REPO="${PANEL_REPO:-Huzhao-1991/s-ui-mo}"
 MODULE="github.com/alireza0/s-ui"
 OUT="${OUT:-dist}"
 VERSION="$(cat config/version 2>/dev/null || echo dev)"

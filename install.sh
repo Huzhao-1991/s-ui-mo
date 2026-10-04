@@ -14,7 +14,7 @@ cur_dir=$(pwd)
 # overridable so a mirror or a private fork needs no edit:
 #   SUI_REPO=owner/repo bash install.sh
 #############################################
-SUI_REPO="${SUI_REPO:-OWNER/REPO}"
+SUI_REPO="${SUI_REPO:-Huzhao-1991/s-ui-mo}"
 
 #############################################
 # Unattended mode

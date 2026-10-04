@@ -20,7 +20,7 @@ function LOGI() {
 # Everything this menu fetches -- the installer and the copy of itself it
 # upgrades to -- comes from here. Overridable without editing the file:
 #   SUI_REPO=owner/repo s-ui update
-SUI_REPO="${SUI_REPO:-OWNER/REPO}"
+SUI_REPO="${SUI_REPO:-Huzhao-1991/s-ui-mo}"
 
 # stop_service removes the service definition and stops it, on either init
 # system. Used by uninstall and purge so the two cannot drift apart.

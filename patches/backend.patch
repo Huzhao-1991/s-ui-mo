@@ -73,13 +73,13 @@ diff -ruN
  # local env files
 diff -ruN
 --- a/Dockerfile	2026-09-16 08:54:30.000000000 +0800
-+++ b/Dockerfile	2026-10-04 11:11:58.996049400 +0800
++++ b/Dockerfile	2026-10-04 16:30:32.475934800 +0800
 @@ -12,6 +12,8 @@
  WORKDIR /app
  ARG TARGETARCH
  ARG TARGETVARIANT
 +# The repository this image checks for its own updates.
-+ARG PANEL_REPO=OWNER/REPO
++ARG PANEL_REPO=Huzhao-1991/s-ui-mo
  ENV CGO_ENABLED=1
  ENV CGO_CFLAGS="-D_LARGEFILE64_SOURCE"
  ENV GOARCH=$TARGETARCH
@@ -94,8 +94,8 @@ diff -ruN
  LABEL org.opencontainers.image.authors="alireza7@gmail.com"
 diff -ruN
 --- a/README-mo.md	1970-01-01 08:00:00.000000000 +0800
-+++ b/README-mo.md	2026-10-04 16:01:15.226323500 +0800
-@@ -0,0 +1,340 @@
++++ b/README-mo.md	2026-10-04 16:30:26.163181000 +0800
+@@ -0,0 +1,348 @@
 +# S-UI 1.6.3 魔改版
 +
 +基于 [alireza0/s-ui](https://github.com/alireza0/s-ui) **v1.6.3**（2026-09-16 发布）的二次开发版本，
@@ -314,15 +314,23 @@ diff -ruN
 +
 +---
 +
-+## 6. 把仓库地址改成你自己的
++## 6. 仓库地址（已配置）
 +
-+安装脚本、菜单脚本、自更新都从「本仓库」取自己的安装包和更新脚本。默认值是占位符 `OWNER/REPO`，**必须改**：
++安装脚本、菜单脚本、自更新都从「本仓库」取自己的安装包和更新脚本。
++
++**本仓库已经指向 `Huzhao-1991/s-ui-mo`**，`install.sh` / `s-ui.sh` / `config/config.go` /
++`build-release.sh` / `Dockerfile` 的默认值都是它，开箱可用。
++
++要换到别的仓库（比如你 fork 走了），跑一次：
 +
 +```bash
 +./setrepo.sh yourname/s-ui-mo
 +```
 +
-+它会改写 `install.sh`、`s-ui.sh`、`service/panel.go`、`config/config.go` 里的默认值。
++它会把这 5 个文件里的默认值一起改写 —— 注意 `build-release.sh` 和 `Dockerfile` 也在内，
++因为它们会用 `-X .../config.PanelRepo=` 把仓库名注入二进制；漏掉它们的话，
++改完 `config/config.go` 也会在构建时被重新覆盖回旧值。
++
 +也可以完全不改源码，用环境变量临时覆盖：
 +
 +```bash
@@ -813,7 +821,7 @@ diff -ruN
 +}
 diff -ruN
 --- a/build-release.sh	1970-01-01 08:00:00.000000000 +0800
-+++ b/build-release.sh	2026-10-04 12:42:59.610113500 +0800
++++ b/build-release.sh	2026-10-04 16:29:39.263130400 +0800
 @@ -0,0 +1,160 @@
 +#!/bin/sh
 +# Cross-compile the Linux release archives.
@@ -844,7 +852,7 @@ diff -ruN
 +
 +cd "$(dirname "$0")"
 +
-+PANEL_REPO="${PANEL_REPO:-OWNER/REPO}"
++PANEL_REPO="${PANEL_REPO:-Huzhao-1991/s-ui-mo}"
 +MODULE="github.com/alireza0/s-ui"
 +OUT="${OUT:-dist}"
 +VERSION="$(cat config/version 2>/dev/null || echo dev)"
@@ -1078,7 +1086,7 @@ diff -ruN
 +}
 diff -ruN
 --- a/config/config.go	2026-09-16 08:54:30.000000000 +0800
-+++ b/config/config.go	2026-10-04 11:00:32.001674000 +0800
++++ b/config/config.go	2026-10-04 16:29:09.736805000 +0800
 @@ -28,6 +28,29 @@
  	return strings.TrimSpace(version)
  }
@@ -1086,7 +1094,7 @@ diff -ruN
 +// PanelRepoDefault is used when nothing overrides it. Release CI rewrites this
 +// to the publishing repository via -ldflags -X, so a release build always knows
 +// where to fetch its own updates from without a code change.
-+const PanelRepoDefault = "OWNER/REPO"
++const PanelRepoDefault = "Huzhao-1991/s-ui-mo"
 +
 +// PanelRepo is the GitHub "owner/repo" this build checks for updates and pulls
 +// install.sh from. Overridden at build time with
@@ -1154,7 +1162,7 @@ diff -ruN
  
 diff -ruN
 --- a/install.sh	2026-09-16 08:54:30.000000000 +0800
-+++ b/install.sh	2026-10-04 14:12:53.693050700 +0800
++++ b/install.sh	2026-10-04 16:28:53.413259800 +0800
 @@ -8,6 +8,65 @@
  cur_dir=$(pwd)
  
@@ -1165,7 +1173,7 @@ diff -ruN
 +# overridable so a mirror or a private fork needs no edit:
 +#   SUI_REPO=owner/repo bash install.sh
 +#############################################
-+SUI_REPO="${SUI_REPO:-OWNER/REPO}"
++SUI_REPO="${SUI_REPO:-Huzhao-1991/s-ui-mo}"
 +
 +#############################################
 +# Unattended mode
@@ -1418,7 +1426,7 @@ diff -ruN
  install_s-ui $1
 diff -ruN
 --- a/s-ui.sh	2026-09-16 08:54:30.000000000 +0800
-+++ b/s-ui.sh	2026-10-04 11:10:19.431114200 +0800
++++ b/s-ui.sh	2026-10-04 16:29:01.585734200 +0800
 @@ -17,6 +17,27 @@
      echo -e "${green}[INF] $* ${plain}"
  }
@@ -1426,7 +1434,7 @@ diff -ruN
 +# Everything this menu fetches -- the installer and the copy of itself it
 +# upgrades to -- comes from here. Overridable without editing the file:
 +#   SUI_REPO=owner/repo s-ui update
-+SUI_REPO="${SUI_REPO:-OWNER/REPO}"
++SUI_REPO="${SUI_REPO:-Huzhao-1991/s-ui-mo}"
 +
 +# stop_service removes the service definition and stops it, on either init
 +# system. Used by uninstall and purge so the two cannot drift apart.
@@ -2004,8 +2012,8 @@ diff -ruN
  		return common.NewError("not logged in")
 diff -ruN
 --- a/setrepo.sh	1970-01-01 08:00:00.000000000 +0800
-+++ b/setrepo.sh	2026-10-04 11:11:43.863329500 +0800
-@@ -0,0 +1,40 @@
++++ b/setrepo.sh	2026-10-04 16:30:17.125347700 +0800
+@@ -0,0 +1,43 @@
 +#!/bin/bash
 +# Point this checkout at the repository that will publish it.
 +#
@@ -2031,7 +2039,10 @@ diff -ruN
 +
 +cd "$(dirname "$0")"
 +count=0
-+for f in install.sh s-ui.sh service/panel.go config/config.go; do
++# build-release.sh 必须在这个列表里：它把 PANEL_REPO 通过
++# -X .../config.PanelRepo 注入二进制，默认值同样是 OWNER/REPO。
++# 漏掉它的话，改完 config/config.go 的默认值也会在构建时被重新覆盖成占位符。
++for f in install.sh s-ui.sh service/panel.go config/config.go build-release.sh Dockerfile; do
 +    [[ -f "$f" ]] || continue
 +    before=$(grep -c 'OWNER/REPO' "$f" || true)
 +    [[ "$before" -gt 0 ]] || continue

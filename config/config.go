@@ -31,7 +31,7 @@ func GetVersion() string {
 // PanelRepoDefault is used when nothing overrides it. Release CI rewrites this
 // to the publishing repository via -ldflags -X, so a release build always knows
 // where to fetch its own updates from without a code change.
-const PanelRepoDefault = "OWNER/REPO"
+const PanelRepoDefault = "Huzhao-1991/s-ui-mo"
 
 // PanelRepo is the GitHub "owner/repo" this build checks for updates and pulls
 // install.sh from. Overridden at build time with

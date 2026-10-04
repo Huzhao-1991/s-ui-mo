@@ -216,15 +216,23 @@ s-ui purge        # 或 install.sh purge
 
 ---
 
-## 6. 把仓库地址改成你自己的
+## 6. 仓库地址（已配置）
 
-安装脚本、菜单脚本、自更新都从「本仓库」取自己的安装包和更新脚本。默认值是占位符 `OWNER/REPO`，**必须改**：
+安装脚本、菜单脚本、自更新都从「本仓库」取自己的安装包和更新脚本。
+
+**本仓库已经指向 `Huzhao-1991/s-ui-mo`**，`install.sh` / `s-ui.sh` / `config/config.go` /
+`build-release.sh` / `Dockerfile` 的默认值都是它，开箱可用。
+
+要换到别的仓库（比如你 fork 走了），跑一次：
 
 ```bash
 ./setrepo.sh yourname/s-ui-mo
 ```
 
-它会改写 `install.sh`、`s-ui.sh`、`service/panel.go`、`config/config.go` 里的默认值。
+它会把这 5 个文件里的默认值一起改写 —— 注意 `build-release.sh` 和 `Dockerfile` 也在内，
+因为它们会用 `-X .../config.PanelRepo=` 把仓库名注入二进制；漏掉它们的话，
+改完 `config/config.go` 也会在构建时被重新覆盖回旧值。
+
 也可以完全不改源码，用环境变量临时覆盖：
 
 ```bash
