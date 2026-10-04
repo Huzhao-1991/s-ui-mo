@@ -1179,7 +1179,7 @@ diff -ruN
  
 diff -ruN
 --- a/install.sh	2026-09-16 08:54:30.000000000 +0800
-+++ b/install.sh	2026-10-04 16:28:53.413259800 +0800
++++ b/install.sh	2026-10-04 17:06:50.246382300 +0800
 @@ -8,6 +8,65 @@
  cur_dir=$(pwd)
  
@@ -1387,7 +1387,47 @@ diff -ruN
  prepare_services() {
      if [[ "${init_system}" == "systemd" ]]; then
          if [[ -f "/etc/systemd/system/sing-box.service" ]]; then
-@@ -516,7 +695,7 @@
+@@ -486,14 +665,32 @@
+         return 0
+     fi
+ 
+-    # Matched by filename, and the leading * that sha256sum writes for a binary
+-    # entry is accepted. Comparing the hashes directly rather than piping into
+-    # `sha256sum -c` keeps this independent of the working directory, which the
+-    # paths in a SHA256SUMS file are relative to.
+-    expected=$(awk -v f="$name" '$2 == f || $2 == "*" f { print $1; exit }' "$sums")
++    # Matched by filename, after stripping the decorations the various sha256sum
++    # invocations put in front of it: '*' for binary mode (sha256sum -b), and
++    # './' when the file was named as a relative path. Missing the './' case is
++    # what made this check silently pointless -- our own release publishes
++    # "./s-ui-linux-amd64.tar.gz", which never equalled the bare basename, so
++    # every install took the "no SHA256SUMS" branch and downloaded unverified.
++    #
++    # Comparing the hashes directly rather than piping into `sha256sum -c` keeps
++    # this independent of the working directory, which the paths in a SHA256SUMS
++    # file are relative to.
++    expected=$(awk -v f="$name" '
++        {
++            p = $2
++            sub(/^\*/, "", p)
++            sub(/^\.\//, "", p)
++            if (p == f) { print $1; exit }
++        }' "$sums")
++
++    # The file is there but says nothing about this archive. That is not the
++    # "release predates checksums" case handled above -- it means the sums are
++    # for something else (a 404 page saved by wget, a leftover from another
++    # build, a tampered list). Installing anyway would hide exactly the attack
++    # this check exists to catch, so refuse.
+     if [[ -z "$expected" ]]; then
+-        echo -e "${yellow}$(t no_checksums)${plain}"
+-        return 0
++        echo -e "${red}$(t checksum_fail)${plain}"
++        return 1
+     fi
+ 
+     actual=$(sha256sum "$archive" | awk '{ print $1 }')
+@@ -516,7 +713,7 @@
      local sums="$workdir/SHA256SUMS"
  
      if [ $# == 0 ]; then
@@ -1396,7 +1436,7 @@ diff -ruN
          if [[ ! -n "$last_version" ]]; then
              echo -e "${red}$(t fetch_fail)${plain}"
              exit 1
-@@ -530,7 +709,7 @@
+@@ -530,7 +727,7 @@
      # No --no-check-certificate. It was on every download here, which turns the
      # whole install into an unauthenticated fetch: anyone able to intercept it
      # chooses the binary that then runs as root.
@@ -1405,7 +1445,7 @@ diff -ruN
      if ! wget -q --show-progress -O "$archive" "${base}/s-ui-linux-$(arch).tar.gz"; then
          if [ $# == 0 ]; then
              echo -e "${red}$(t download_fail)${plain}"
-@@ -587,7 +766,10 @@
+@@ -587,7 +784,10 @@
          systemctl enable s-ui --now
      fi
  
@@ -1417,7 +1457,7 @@ diff -ruN
      echo -e "$(t access_panel)${green}"
      /usr/local/s-ui/sui uri
      echo -e "${plain}"
-@@ -595,6 +777,23 @@
+@@ -595,6 +795,23 @@
      s-ui help
  }
  

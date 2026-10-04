@@ -665,14 +665,32 @@ verify_checksum() {
         return 0
     fi
 
-    # Matched by filename, and the leading * that sha256sum writes for a binary
-    # entry is accepted. Comparing the hashes directly rather than piping into
-    # `sha256sum -c` keeps this independent of the working directory, which the
-    # paths in a SHA256SUMS file are relative to.
-    expected=$(awk -v f="$name" '$2 == f || $2 == "*" f { print $1; exit }' "$sums")
+    # Matched by filename, after stripping the decorations the various sha256sum
+    # invocations put in front of it: '*' for binary mode (sha256sum -b), and
+    # './' when the file was named as a relative path. Missing the './' case is
+    # what made this check silently pointless -- our own release publishes
+    # "./s-ui-linux-amd64.tar.gz", which never equalled the bare basename, so
+    # every install took the "no SHA256SUMS" branch and downloaded unverified.
+    #
+    # Comparing the hashes directly rather than piping into `sha256sum -c` keeps
+    # this independent of the working directory, which the paths in a SHA256SUMS
+    # file are relative to.
+    expected=$(awk -v f="$name" '
+        {
+            p = $2
+            sub(/^\*/, "", p)
+            sub(/^\.\//, "", p)
+            if (p == f) { print $1; exit }
+        }' "$sums")
+
+    # The file is there but says nothing about this archive. That is not the
+    # "release predates checksums" case handled above -- it means the sums are
+    # for something else (a 404 page saved by wget, a leftover from another
+    # build, a tampered list). Installing anyway would hide exactly the attack
+    # this check exists to catch, so refuse.
     if [[ -z "$expected" ]]; then
-        echo -e "${yellow}$(t no_checksums)${plain}"
-        return 0
+        echo -e "${red}$(t checksum_fail)${plain}"
+        return 1
     fi
 
     actual=$(sha256sum "$archive" | awk '{ print $1 }')
