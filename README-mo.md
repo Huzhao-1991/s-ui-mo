@@ -177,23 +177,31 @@ apt-get install -y gcc musl-tools \
 
 ### 4.3 本次构建与验证记录
 
-在 Debian 12 / 1 核 / 973 MB 内存 / 4.9 GB 磁盘的 VPS 上实际跑通：
+本次（`1.6.3-mo3`）在 Windows 本机交叉编译，交付物在 Debian 12 VPS 上冒烟：
 
 | 项目 | 结果 |
 |---|---|
-| 工具链 | Go 1.26.8 + musl-gcc 12.2 + aarch64/armhf 交叉 gcc |
-| 前端 | `npm run build` 通过（含 `vue-tsc --noEmit` 类型检查），产物已嵌入 `web/html` |
-| amd64 | `s-ui-linux-amd64.tar.gz` 35 662 141 B，**ELF 64-bit LSB, statically linked, stripped** |
-| 版本 | `s-ui -v` → `S-UI Panel 1.6.3-mo2` / `Sing-Box v1.14.1` |
-| 安装 | `SUI_AUTO=1 bash install.sh` 全流程通过：下载 → SHA256 校验 → 解包 → 随机账号/路径 → systemd 启用并启动 |
+| 工具链 | Go 1.26.8 + zig 0.14.1（`zig cc -target x86_64-linux-musl`），`CGO_ENABLED=1` |
+| 链接 | `-linkmode external -extldflags '-static -s'`，产出全静态 ELF |
+| 前端 | `npm run build` 通过（含 `vue-tsc --noEmit` 类型检查），917 modules，产物已嵌入 `web/html` |
+| 嵌入校验 | 运行时 JS 的 sha256 = `dae5028e…12b4`，与本地 `web/html/assets/5e4dcb973a1cc7a5.js` **逐字节一致** |
+| amd64 | `s-ui-linux-amd64.tar.gz` 35 761 975 B（内含 `sui` 102 422 408 B），**ELF 64-bit LSB, statically linked, stripped** |
+| 版本 | `api/updateInfo` → `currentVersion=1.6.3-mo3` |
+| 冒烟 | 13/13 通过：安装 → SHA256 校验 → 解包 → 随机账号/路径 → systemd enabled+active → 登录 / `api/settings` / `api/servers` / `api/updateInfo` / `api/testServer` |
+| 补丁 | `backend.patch` 23 文件，`frontend.patch` 17 文件，`verify.py` 校验「干净应用 + 与交付目录逐字节一致」通过 |
+
+早前的 `mo1` / `mo2` 在 Debian 12 / 1 核 / 973 MB 内存 VPS 上用 musl-gcc 构建并做过更完整的功能验证，
+其中后续版本仍然复用的结论：
+
+| 项目 | 结果 |
+|---|---|
 | 服务 | `s-ui.service` = enabled + active，监听 `*:2095`（面板）与 `*:2096`（订阅） |
-| 接口 | 登录、`api/settings`、`api/servers`、`api/updateInfo`、`api/save object=servers`（落库已回读）、`api/testServer` 全部符合预期 |
 | 中转 | 双实例实测：A 自身 `webPort=2095`，带 `X-Remote-Server` 请求返回 **B 的 `webPort=12096`**；`servers` 列表仍由 A 本地提供（守卫生效） |
 | 重装 | 再跑一次 `install.sh` 走「保留现有设置」分支，账号/路径不变、服务正常重启 |
 | 中转页 | `/relay` 登录后 200；向导全链路实测：建落地出站 → config 追加路由规则落库 → `checkOutbound` 探测 → 按页面同路径删除且无残留 |
 
-**本次交付只出 `linux/amd64` 一份包**（外加 `install.sh` 与 `SHA256SUMS`）。ARM 目标用同一条
-`./build-release.sh` 命令即可产出（见 4.1 的交叉编译依赖清单），只是没有纳入这次交付。
+**每次交付只出 `linux/amd64` 一份包**（外加 `install.sh` 与 `SHA256SUMS`）。ARM 目标用同一条
+`./build-release.sh` 命令即可产出（见 4.1 的交叉编译依赖清单），只是没有纳入交付。
 
 构建过程本身也踩了两个只有小机器才会遇到的坑，记录在此以免复现：
 - **磁盘**：Go 构建缓存会长到 1.4 GB 量级，加上模块缓存后 4.9 GB 的盘会被写满，表现为
@@ -298,7 +306,9 @@ rm -rf web/html && mkdir -p web/html && cp -r frontend/dist/* web/html/
 ## 8. 已知限制
 
 - **naive 出站**：本机交叉编译用的是 `with_purego` 配置，运行时需要 `libcronet.so` 才能用 naive（与本仓库 Dockerfile 的 docker profile 一致）。不涉及 naive 的部署无影响。
-- **翻译**：新增文案做了英文、简体中文、繁体中文；波斯语/越南语/俄语回退到英文（i18n 的 fallback 是 en）。
+- **翻译**：`server` 组文案有英文 / 简体中文 / 繁体中文三份；`relay`（中转管理）与 `exportLinks`
+  （导出链接）两组只有**英文与简体中文**。缺的段靠 i18n 的 `fallbackLocale: 'en'` 回退成英文
+  （界面照常可用，不会出现空白），波斯语、越南语、俄语三份则只保留上游原有文案。
 - **自更新仅支持 Linux**：Windows 构建下点按钮会返回明确错误。
 - **官方 CI 的产物与本地手工构建不是同一套工具链**：CI 用 Bootlin musl sysroot（全静态 musl），
   本机 amd64 用 `musl-gcc`（等价），ARM 目标用 Debian 交叉 gcc + `-static`（静态 glibc）。
@@ -324,22 +334,27 @@ rm -rf web/html && mkdir -p web/html && cp -r frontend/dist/* web/html/
 | `cmd/token.go` / `cmd/cmd.go` | `s-ui token` 子命令 |
 | `util/shadowsocks.go` | SS-2022 32 字节密钥方法 |
 | `config/config.go` | `PanelRepo` / `GetPanelRepo` |
-| `config/version` | `1.6.3-mo2` |
+| `config/version` | `1.6.3-mo3` |
 
 前端：
 
 | 文件 | 说明 |
 |---|---|
-| `src/plugins/remote.ts` | 新增：当前被管理面板的 id（含持久化） |
-| `src/types/servers.ts` | 新增：Server 类型 |
-| `src/layouts/modals/Server.vue` | 新增：服务器增改弹窗 |
-| `src/views/Servers.vue` | 新增：服务器列表页 |
-| `src/plugins/api.ts` | 每个请求注入 `X-Remote-Server` |
-| `src/store/modules/data.ts` | servers / currentServer / loadServers / switchServer |
-| `src/router/index.ts` | `/servers` 路由；启动时拉一次列表 |
 | `src/layouts/default/Drawer.vue` | 菜单项 + 当前管理对象提示 |
+| `src/layouts/modals/Client.vue` | 新增 `presetInbounds`：从别处新增用户时预勾入站 |
+| `src/layouts/modals/ExportLinks.vue` | 新增：导出订阅 URL / 分享链接弹窗 |
+| `src/layouts/modals/RelayUsers.vue` | 新增：中转用户管理（列表 / 增删改 / 启用 / 二维码） |
+| `src/layouts/modals/RelayWizard.vue` | 新增：添加中转向导（解析落地链接 → 分配出站 tag → 勾入口入站） |
+| `src/layouts/modals/Server.vue` | 新增：服务器增改弹窗 |
+| `src/locales/{en,zhcn,zhtw}.ts` | 新增文案（三份的覆盖范围见 §8） |
+| `src/plugins/api.ts` | 每个请求注入 `X-Remote-Server` |
+| `src/plugins/remote.ts` | 新增：当前被管理面板的 id（含持久化） |
+| `src/router/index.ts` | `/servers`、`/relay` 路由；启动时拉一次列表 |
+| `src/store/modules/data.ts` | servers / currentServer / loadServers / switchServer |
+| `src/types/servers.ts` | 新增：Server 类型 |
+| `src/views/Relay.vue` | 新增：中转管理页 |
+| `src/views/Servers.vue` | 新增：服务器列表页 |
 | `src/views/Settings.vue` | 版本检查 + 一键升级按钮 |
-| `src/locales/{en,zhcn,zhtw}.ts` | 新增文案 |
 
 脚本 / CI：
 
@@ -349,7 +364,7 @@ rm -rf web/html && mkdir -p web/html && cp -r frontend/dist/* web/html/
 | `s-ui.sh` | `SUI_REPO`、卸载保留数据库、`purge`、`token`、菜单第 21 项 |
 | `setrepo.sh` | 新增：一键替换仓库占位符 |
 | `build-release.sh` | 新增：跨平台交叉编译 + 打包 + SHA256SUMS |
-| `.github/workflows/release.yml` | tag 戳版本号、注入 PanelRepo |
+| `.github/workflows/release.yml` | 改为**仅手动触发**；构建时注入 PanelRepo、按 tag 戳版本号 |
 | `Dockerfile` | `ARG PANEL_REPO` |
 
 `patches/backend.patch`、`patches/frontend.patch` 是相对上游的完整 diff，便于逐行审阅。
