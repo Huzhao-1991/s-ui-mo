@@ -1,11 +1,17 @@
 name: Docker Image CI
+# 仅手动触发。上游是「推 tag 就跑」，但在本仓库里这样跑不通、也不该自动跑：
+#
+#   - 下面的 images 指向的是**上游自己的命名空间**（Docker Hub 的 alireza7/s-ui、
+#     ghcr.io/alireza0/s-ui）。本仓库没有 DOCKER_HUB_USERNAME / DOCKER_HUB_TOKEN
+#     这两个 secret，登录必失败；万一配上了，那也是在往别人的命名空间写 tag。
+#   - 结果是每推一个 tag 就在 Release 旁边留一条失败的 CI 记录（v1.6.3-mo2 与
+#     v1.6.3-mo3 各一条），纯粹是噪音。
+#
+# 要用就手动触发：先把 images 改成自己的命名空间并补上两个 Docker Hub secret。
+# 这个工作流只推镜像，不往仓库里写任何东西。
 on:
-  push:
-    tags:
-      - "*"
   workflow_dispatch:
 
-# The workflow pushes images; nothing here writes to the repository.
 permissions:
   contents: read
   packages: write

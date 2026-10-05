@@ -310,6 +310,10 @@ rm -rf web/html && mkdir -p web/html && cp -r frontend/dist/* web/html/
   （导出链接）两组只有**英文与简体中文**。缺的段靠 i18n 的 `fallbackLocale: 'en'` 回退成英文
   （界面照常可用，不会出现空白），波斯语、越南语、俄语三份则只保留上游原有文案。
 - **自更新仅支持 Linux**：Windows 构建下点按钮会返回明确错误。
+- **Docker 镜像 CI 已改为手动**：上游 `.github/workflows/docker.yml` 会在推 tag 时自动跑，
+  但它推的是**上游自己的命名空间**（Docker Hub `alireza7/s-ui`、`ghcr.io/alireza0/s-ui`）。
+  本仓库没有对应的 Docker Hub secret，登录必失败，于是每个 tag 旁边都挂一条失败的 CI。
+  要用就手动触发，并先把 `images:` 改成自己的命名空间。
 - **官方 CI 的产物与本地手工构建不是同一套工具链**：CI 用 Bootlin musl sysroot（全静态 musl），
   本机 amd64 用 `musl-gcc`（等价），ARM 目标用 Debian 交叉 gcc + `-static`（静态 glibc）。
   两者都能跑，但 ARM 那两份的 DNS/NSS 走静态 glibc 的内置实现，不如 musl 干净；要更干净就直接用 CI 产出。
@@ -365,6 +369,7 @@ rm -rf web/html && mkdir -p web/html && cp -r frontend/dist/* web/html/
 | `setrepo.sh` | 新增：一键替换仓库占位符 |
 | `build-release.sh` | 新增：跨平台交叉编译 + 打包 + SHA256SUMS |
 | `.github/workflows/release.yml` | 改为**仅手动触发**；构建时注入 PanelRepo、按 tag 戳版本号 |
+| `.github/workflows/docker.yml` | 改为**仅手动触发**（上游是推 tag 就跑，且推的是上游命名空间，见 §8） |
 | `Dockerfile` | `ARG PANEL_REPO` |
 
 `patches/backend.patch`、`patches/frontend.patch` 是相对上游的完整 diff，便于逐行审阅。
