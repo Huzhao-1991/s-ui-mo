@@ -1,0 +1,48 @@
+.DS_Store
+dist/
+release/
+backup/
+bin/
+db/
+sui
+main
+tmp
+.sync*
+*.tar.gz
+# build-release.sh staging directories, one per target
+.stage-*
+
+# local env files
+.env.local
+.env.*.local
+
+# Log files
+*.log*
+.cache
+
+# Windows build artifacts
+*.exe
+*.zip
+s-ui-windows/
+sui-*.exe
+sui-*.zip
+windows/sui-*.exe
+
+# Editor directories and files
+.idea
+.vscode
+
+# ---------------------------------------------------------------------------
+# 与上游 .gitignore 的差异（s-ui-mo 魔改版）
+#
+# 上游把前端放在独立仓库 alireza0/s-ui-frontend，主仓库用 git submodule 引用，
+# 所以上游会忽略 frontend/ 与 web/html（靠 CI 另拉前端仓库再构建）。
+#
+# 本仓库改为内置前端源码（.gitmodules 已删除，克隆即可构建）：
+#   - 不再忽略 frontend/    前端源码随仓库一起分发
+#   - 不再忽略 web/html     前端已构建并嵌入，go build 开箱即用
+# 前端的两类生成物仍然忽略：
+# ---------------------------------------------------------------------------
+frontend/node_modules/
+frontend/dist/
+frontend/coverage/
