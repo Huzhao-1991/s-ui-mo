@@ -129,7 +129,15 @@ for t in $targets; do
         # Pair with a musl C compiler. Static glibc warns about getaddrinfo and
         # can only resolve hostnames through whatever NSS is compiled into
         # libc; musl has no such split.
-        build_ldflags="$build_ldflags -linkmode external -extldflags '-static'"
+        #
+        # -s is repeated here on purpose. The -w -s from ldflags_for are
+        # Go-linker options and the final link is done by the external linker,
+        # so under linkers that do not inherit them (lld, i.e. zig cc) the
+        # binary comes out with .symtab/.strtab/.debug_* intact -- about 21 MB
+        # heavier than the same source built with binutils ld. Asking the
+        # external linker to strip directly makes both toolchains produce the
+        # same size. Harmless when it is already stripped.
+        build_ldflags="$build_ldflags -linkmode external -extldflags '-static -s'"
     fi
 
     go build -trimpath -ldflags="$build_ldflags" -tags "$TAGS" -o "$stmp/s-ui/sui" main.go

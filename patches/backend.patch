@@ -829,8 +829,8 @@ diff -ruN
 +}
 diff -ruN
 --- a/build-release.sh	1970-01-01 08:00:00.000000000 +0800
-+++ b/build-release.sh	2026-10-04 16:29:39.263130400 +0800
-@@ -0,0 +1,160 @@
++++ b/build-release.sh	2026-10-05 17:25:19.190109700 +0800
+@@ -0,0 +1,168 @@
 +#!/bin/sh
 +# Cross-compile the Linux release archives.
 +#
@@ -962,7 +962,15 @@ diff -ruN
 +        # Pair with a musl C compiler. Static glibc warns about getaddrinfo and
 +        # can only resolve hostnames through whatever NSS is compiled into
 +        # libc; musl has no such split.
-+        build_ldflags="$build_ldflags -linkmode external -extldflags '-static'"
++        #
++        # -s is repeated here on purpose. The -w -s from ldflags_for are
++        # Go-linker options and the final link is done by the external linker,
++        # so under linkers that do not inherit them (lld, i.e. zig cc) the
++        # binary comes out with .symtab/.strtab/.debug_* intact -- about 21 MB
++        # heavier than the same source built with binutils ld. Asking the
++        # external linker to strip directly makes both toolchains produce the
++        # same size. Harmless when it is already stripped.
++        build_ldflags="$build_ldflags -linkmode external -extldflags '-static -s'"
 +    fi
 +
 +    go build -trimpath -ldflags="$build_ldflags" -tags "$TAGS" -o "$stmp/s-ui/sui" main.go
