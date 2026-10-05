@@ -15,7 +15,7 @@ require (
 	github.com/sagernet/sing v0.9.4
 	github.com/sagernet/sing-box v1.14.1
 	github.com/sagernet/sing-mux v0.3.6
-	github.com/sagernet/sing-quic v0.7.0
+	github.com/sagernet/sing-quic v0.7.1
 	github.com/sagernet/sing-shadowsocks v0.2.8
 	github.com/sagernet/sing-snell v0.0.0-20260829071736-20f2eaec77c3
 	github.com/sagernet/sing-tun v0.9.3
