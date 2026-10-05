@@ -454,6 +454,12 @@ export default {
     id: { type: Number, required: true },
     inboundTags: { type: Array as PropType<InboundTag[]>, required: true },
     groups: { type: Array as PropType<string[]>, required: true },
+    // Inbound ids to pre-tick on a NEW client. The relay page hands over its
+    // own entry inbounds, so "add user" from a relay card lands the user on
+    // the inbound that actually carries that relay's traffic instead of
+    // leaving the operator to re-pick it. Ignored when editing: there the
+    // saved binding is the truth.
+    presetInbounds: { type: Array as PropType<number[]>, default: () => [] },
   },
   emits: ['close'],
   data() {
@@ -540,6 +546,11 @@ export default {
       }
       else {
         this.client = createClient()
+        // Pre-tick the caller's inbounds (see presetInbounds). Sorted the same
+        // way the clientInbounds setter sorts, so the chips come out in the
+        // Inbounds-page order rather than in whatever order they arrived.
+        const preset = this.$props.presetInbounds ?? []
+        if (preset.length > 0) this.client.inbounds = [...preset].sort()
         this.title = "add"
         this.clientConfig = randomConfigs('client')
       }

@@ -75,6 +75,11 @@ export default {
     delConfirm: "Delete this relay (its route rule and the landing outbound)?",
     clearAll: "Delete All",
     clearAllConfirm: "Delete ALL relays (route rules + landing outbounds)? This cannot be undone.",
+    users: "Users",
+    manageUsers: "Manage users",
+    addUser: "Add user",
+    usersHint: "A user reaches this landing only when it is bound to one of the entry inbound(s) below. Add, edit, delete or show a QR code right here; a new user gets the entry inbound(s) pre-ticked.",
+    noUsers: "No user is bound to this relay's entry inbound yet.",
   },
   // Export links: bulk-export client subscriptions / share links
   exportLinks: {

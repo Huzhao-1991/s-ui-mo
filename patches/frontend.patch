@@ -45,6 +45,34 @@ diff -ruN
    { title: 'pages.basics', icon: 'mdi-application-cog',  path: '/basics' },
    { title: 'pages.rules', icon: 'mdi-routes',  path: '/rules' },
 diff -ruN
+--- a/src/layouts/modals/Client.vue	2026-09-16 08:54:08.000000000 +0800
++++ b/src/layouts/modals/Client.vue	2026-10-05 17:15:11.840248300 +0800
+@@ -454,6 +454,12 @@
+     id: { type: Number, required: true },
+     inboundTags: { type: Array as PropType<InboundTag[]>, required: true },
+     groups: { type: Array as PropType<string[]>, required: true },
++    // Inbound ids to pre-tick on a NEW client. The relay page hands over its
++    // own entry inbounds, so "add user" from a relay card lands the user on
++    // the inbound that actually carries that relay's traffic instead of
++    // leaving the operator to re-pick it. Ignored when editing: there the
++    // saved binding is the truth.
++    presetInbounds: { type: Array as PropType<number[]>, default: () => [] },
+   },
+   emits: ['close'],
+   data() {
+@@ -540,6 +546,11 @@
+       }
+       else {
+         this.client = createClient()
++        // Pre-tick the caller's inbounds (see presetInbounds). Sorted the same
++        // way the clientInbounds setter sorts, so the chips come out in the
++        // Inbounds-page order rather than in whatever order they arrived.
++        const preset = this.$props.presetInbounds ?? []
++        if (preset.length > 0) this.client.inbounds = [...preset].sort()
+         this.title = "add"
+         this.clientConfig = randomConfigs('client')
+       }
+diff -ruN
 --- a/src/layouts/modals/ExportLinks.vue	1970-01-01 08:00:00.000000000 +0800
 +++ b/src/layouts/modals/ExportLinks.vue	2026-10-04 15:03:11.897354200 +0800
 @@ -0,0 +1,197 @@
@@ -243,6 +271,374 @@ diff -ruN
 +    },
 +  },
 +  components: { QrcodeVue },
++}
++</script>
+diff -ruN
+--- a/src/layouts/modals/RelayUsers.vue	1970-01-01 08:00:00.000000000 +0800
++++ b/src/layouts/modals/RelayUsers.vue	2026-10-05 17:15:35.920766800 +0800
+@@ -0,0 +1,364 @@
++<template>
++  <!-- ======================================================================
++    中转用户管理（RelayUsers）
++    --------------------------------------------------------------------
++    一个中转的「用户」就是绑定在它入口入站上的客户端。这不是偷懒，是结构决定的：
++    中转本身不是独立数据模型，只是「一条 inbound -> outbound 的路由规则 +
++    一个落地出站」，而 sing-box 的用户认证发生在入口入站上。所以任何能连上
++    入口入站的客户端，它的流量必然按该入站的规则走这个落地 —— 两者是同一批对象。
++
++    因此本弹窗只做一件事：把「入口入站上的客户端」按中转视角列出来，并复用
++    全局的用户弹窗做增删改，不另造一套表单。新增时把入口入站预先勾上
++    （ClientModal 的 presetInbounds），省掉「建完还得回去改入站」这一步。
++    ====================================================================== -->
++  <ClientModal
++    :id="editor.id"
++    v-model="editor.visible"
++    :visible="editor.visible"
++    :groups="groups"
++    :inbound-tags="inboundTags"
++    :preset-inbounds="presetInbounds"
++    @close="closeEditor"
++  />
++  <QrCode
++    :id="qrcode.id"
++    v-model="qrcode.visible"
++    :visible="qrcode.visible"
++    @close="qrcode.visible = false"
++  />
++  <!-- 删除是不可逆操作，先弹确认框 -->
++  <v-dialog
++    v-model="del.visible"
++    width="380"
++  >
++    <v-card
++      class="rounded-lg"
++      :title="$t('actions.del')"
++    >
++      <v-divider />
++      <v-card-text>{{ $t('confirm') }} — {{ del.name }}</v-card-text>
++      <v-card-actions>
++        <v-spacer />
++        <v-btn
++          color="success"
++          variant="outlined"
++          @click="del.visible = false"
++        >
++          {{ $t('no') }}
++        </v-btn>
++        <v-btn
++          color="error"
++          variant="tonal"
++          :loading="del.loading"
++          @click="delUser"
++        >
++          {{ $t('yes') }}
++        </v-btn>
++      </v-card-actions>
++    </v-card>
++  </v-dialog>
++  <v-dialog
++    :model-value="visible"
++    transition="dialog-bottom-transition"
++    width="920"
++    @update:model-value="onDialogToggle"
++  >
++    <v-card class="rounded-lg">
++      <v-card-title>
++        <v-row align="center">
++          <v-col>{{ $t('relay.users') }}<span
++            v-if="name"
++            class="text-medium-emphasis"
++          > · {{ name }}</span></v-col>
++          <v-spacer />
++          <v-col cols="auto">
++            <v-icon
++              icon="mdi-close-box"
++              @click="$emit('close')"
++            />
++          </v-col>
++        </v-row>
++      </v-card-title>
++      <v-divider />
++      <v-card-subtitle class="pt-3">
++        {{ $t('relay.usersHint') }}
++      </v-card-subtitle>
++      <v-card-text style="overflow-y: auto; max-height: 62vh; padding-top: 0;">
++        <!-- 该中转的入口入站：下面列出的用户都挂在这些入站上 -->
++        <v-row align="center">
++          <v-col
++            cols="auto"
++            class="text-medium-emphasis"
++          >
++            {{ $t('relay.entry') }}
++          </v-col>
++          <v-col>
++            <v-chip
++              v-for="t in entryTags"
++              :key="t"
++              size="small"
++              label
++              class="ma-1"
++            >
++              {{ t }}
++            </v-chip>
++          </v-col>
++        </v-row>
++        <v-row v-if="users.length === 0">
++          <v-col
++            cols="12"
++            style="text-align: center; opacity: 0.6; margin-top: 20px;"
++          >
++            {{ $t('relay.noUsers') }}
++          </v-col>
++        </v-row>
++        <v-data-table
++          v-else
++          :headers="headers"
++          :items="users"
++          :items-per-page="10"
++          :hide-default-footer="users.length<=10"
++          hide-no-data
++          fixed-header
++          item-value="name"
++          class="elevation-3 rounded"
++        >
++          <template #item.enable="{ item }">
++            <v-switch
++              :model-value="item.enable"
++              :loading="toggling[item.id]"
++              :disabled="toggling[item.id]"
++              color="success"
++              density="compact"
++              hide-details
++              @update:model-value="(val:any) => toggleEnable(item, !!val)"
++            />
++          </template>
++          <!-- 该用户实际挂在这几个入站上；标出属于本中转的入口入站 -->
++          <template #item.inbounds="{ item }">
++            <v-chip
++              v-for="t in tagsOf(item)"
++              :key="t"
++              size="x-small"
++              label
++              class="ma-1"
++              :color="entryTags.includes(t) ? 'primary' : ''"
++              :variant="entryTags.includes(t) ? 'tonal' : 'outlined'"
++            >
++              {{ t }}
++            </v-chip>
++          </template>
++          <template #item.volume="{ item }">
++            <v-chip
++              size="small"
++              :color="item.volume==0 ? 'success' : item.volume<=(item.up + item.down)? 'error': ''"
++              label
++            >
++              {{ HumanReadable.sizeFormat(item.up + item.down) + ' / ' + (item.volume == 0 ? $t('unlimited') : HumanReadable.sizeFormat(item.volume)) }}
++            </v-chip>
++          </template>
++          <template #item.expiry="{ item }">
++            <v-chip
++              size="small"
++              :color="item.expiry==0 ? 'success' : item.expiry<=Date.now()/1000? 'error': ''"
++              label
++            >
++              {{ HumanReadable.remainedDays(item.expiry) }}
++            </v-chip>
++          </template>
++          <template #item.online="{ item }">
++            <v-chip
++              v-if="isOnline(item.name)"
++              density="comfortable"
++              size="small"
++              color="success"
++              variant="flat"
++            >
++              {{ $t('online') }}
++            </v-chip>
++            <template v-else>
++              -
++            </template>
++          </template>
++          <template #item.actions="{ item }">
++            <v-icon
++              class="me-2"
++              @click="editUser(item.id)"
++            >
++              mdi-pencil
++            </v-icon>
++            <v-icon
++              class="me-2"
++              @click="showQrCode(item.id)"
++            >
++              mdi-qrcode
++            </v-icon>
++            <v-icon
++              color="error"
++              @click="askDelUser(item)"
++            >
++              mdi-delete
++            </v-icon>
++          </template>
++        </v-data-table>
++      </v-card-text>
++      <v-divider />
++      <v-card-actions>
++        <v-btn
++          color="primary"
++          variant="tonal"
++          prepend-icon="mdi-account-plus"
++          @click="addUser"
++        >
++          {{ $t('relay.addUser') }}
++        </v-btn>
++        <v-spacer />
++        <v-btn
++          color="primary"
++          variant="outlined"
++          @click="$emit('close')"
++        >
++          {{ $t('actions.close') }}
++        </v-btn>
++      </v-card-actions>
++    </v-card>
++  </v-dialog>
++</template>
++
++<script lang="ts" setup>
++// ---------------------------------------------------------------------------
++// 中转用户管理
++// 列表来源 = Data().clients 里 inbounds 命中本中转入口入站的客户端。
++// 增删改全部走全局那套：ClientModal（api/save object=clients）+ QrCode。
++// ---------------------------------------------------------------------------
++import Data from '@/store/modules/data'
++import ClientModal from '@/layouts/modals/Client.vue'
++import QrCode from '@/layouts/modals/QrCode.vue'
++import { Client } from '@/types/clients'
++import { computed, ref } from 'vue'
++import { HumanReadable } from '@/plugins/utils'
++import { i18n } from '@/locales'
++
++const props = defineProps<{
++  visible: boolean
++  // 本中转的入口入站 tag 列表；用户就是挂在这些入站上的
++  entryTags: string[]
++  // 中转名（落地出站 tag），只用于标题
++  name: string
++}>()
++
++const emit = defineEmits<{ close: [] }>()
++
++// v-dialog 关闭（点遮罩 / Esc）时也要通知父组件，否则父组件的 visible 还是 true
++const onDialogToggle = (v: boolean) => {
++  if (!v) emit('close')
++}
++
++type ClientRow = Client & { id: number }
++
++// 入口入站对象（按 tag 反查）。入口入站可能已被删除，故这里取交集。
++const entryInbounds = computed(() =>
++  (Data().inbounds || []).filter((i: any) => props.entryTags.includes(i.tag))
++)
++const entryIds = computed(() => entryInbounds.value.map((i: any) => i.id))
++
++// 该中转的用户 = 绑定到任一入口入站的客户端
++const users = computed((): ClientRow[] =>
++  (Data().clients || []).filter((c: any) =>
++    Array.isArray(c.inbounds) && c.inbounds.some((id: number) => entryIds.value.includes(id))
++  ) as ClientRow[]
++)
++
++// 新增用户可以绑定的入站范围：与全局用户页一致（所有带 users 的入站），
++// 只是把本中转的入口入站预先勾上——比"只允许绑这几个"更灵活，
++// 操作员可以把同一个用户同时挂到别的线上。
++const inboundTags = computed((): { title: string, value: number }[] =>
++  (Data().inbounds || [])
++    .filter((i: any) => i.tag != '' && (i as { users?: unknown }).users)
++    .map((i: any) => ({ title: i.tag, value: i.id }))
++)
++
++// 预勾选的入口入站：取与本中转入口 tag 对应、且确实在可选列表里的那些 id
++const presetInbounds = computed(() => {
++  const allowed = new Set(inboundTags.value.map(t => t.value))
++  return entryIds.value.filter((id: number) => allowed.has(id))
++})
++
++const groups = computed((): string[] =>
++  Array.from(new Set((Data().clients || []).map((c: any) => c.group)))
++)
++
++const isOnline = (name: string) => Data().onlines?.user?.includes(name) ?? false
++
++// 某个用户挂的入站 tag 列表（用于在表格里看出它是不是也走别处）
++const tagsOf = (item: ClientRow): string[] =>
++  (item.inbounds || [])
++    .map((id: number) => (Data().inbounds || []).find((i: any) => i.id == id)?.tag)
++    .filter((t: any): t is string => !!t)
++
++const headers = [
++  { title: i18n.global.t('client.name'), key: 'name' },
++  { title: i18n.global.t('enable'), key: 'enable', width: 60 },
++  { title: i18n.global.t('client.group'), key: 'group' },
++  { title: i18n.global.t('pages.inbounds'), key: 'inbounds', sortable: false },
++  { title: i18n.global.t('stats.volume'), key: 'volume' },
++  { title: i18n.global.t('date.expiry'), key: 'expiry' },
++  { title: i18n.global.t('online'), key: 'online' },
++  { title: i18n.global.t('actions.action'), key: 'actions', sortable: false },
++]
++
++// ---- 新增 / 编辑：复用全局用户弹窗 --------------------------------------
++const editor = ref({ visible: false, id: 0 })
++
++const addUser = () => {
++  editor.value.id = 0
++  editor.value.visible = true
++}
++
++const editUser = (id: number) => {
++  editor.value.id = id
++  editor.value.visible = true
++}
++
++const closeEditor = () => {
++  editor.value.visible = false
++}
++
++// ---- 二维码 ------------------------------------------------------------
++const qrcode = ref({ visible: false, id: 0 })
++
++const showQrCode = (id: number) => {
++  qrcode.value.id = id
++  qrcode.value.visible = true
++}
++
++// ---- 启用开关：与全局用户页同一套（先取全量再改，避免把关联字段写丢）----
++const toggling = ref<Record<number, boolean>>({})
++
++const toggleEnable = async (item: ClientRow, val: boolean) => {
++  if (item.enable === val) return
++  toggling.value = { ...toggling.value, [item.id]: true }
++  const full = await Data().loadClients(item.id)
++  if (full?.id) {
++    full.enable = val
++    await Data().save('clients', 'edit', full)
++  }
++  toggling.value = { ...toggling.value, [item.id]: false }
++}
++
++// ---- 删除 --------------------------------------------------------------
++const del = ref({ visible: false, loading: false, id: 0, name: '' })
++
++const askDelUser = (item: ClientRow) => {
++  del.value.id = item.id
++  del.value.name = item.name
++  del.value.visible = true
++}
++
++const delUser = async () => {
++  del.value.loading = true
++  const ok = await Data().save('clients', 'del', del.value.id)
++  del.value.loading = false
++  if (ok) del.value.visible = false
 +}
 +</script>
 diff -ruN
@@ -603,7 +999,7 @@ diff -ruN
 +</script>
 diff -ruN
 --- a/src/locales/en.ts	2026-09-16 08:54:08.000000000 +0800
-+++ b/src/locales/en.ts	2026-10-04 15:02:16.880822600 +0800
++++ b/src/locales/en.ts	2026-10-05 17:16:15.632842000 +0800
 @@ -42,8 +42,10 @@
      login: "Login",
      home: "Home",
@@ -615,7 +1011,7 @@ diff -ruN
      endpoints: "Endpoints",
      clients: "Clients",
      rules: "Rules",
-@@ -53,6 +55,41 @@
+@@ -53,6 +55,46 @@
      admins: "Admins",
      settings: "Settings",
    },
@@ -639,6 +1035,11 @@ diff -ruN
 +    delConfirm: "Delete this relay (its route rule and the landing outbound)?",
 +    clearAll: "Delete All",
 +    clearAllConfirm: "Delete ALL relays (route rules + landing outbounds)? This cannot be undone.",
++    users: "Users",
++    manageUsers: "Manage users",
++    addUser: "Add user",
++    usersHint: "A user reaches this landing only when it is bound to one of the entry inbound(s) below. Add, edit, delete or show a QR code right here; a new user gets the entry inbound(s) pre-ticked.",
++    noUsers: "No user is bound to this relay's entry inbound yet.",
 +  },
 +  // Export links: bulk-export client subscriptions / share links
 +  exportLinks: {
@@ -657,7 +1058,7 @@ diff -ruN
    main: {
      tiles: "Tiles",
      gauges: "Gauges",
-@@ -105,6 +142,7 @@
+@@ -105,6 +147,7 @@
      rule: "Rule",
      ruleset: "Ruleset",
      service: "Service",
@@ -665,7 +1066,7 @@ diff -ruN
      dnsserver: "DNS Server",
      dnsrule: "DNS Rule",
      user: "User",
-@@ -144,6 +182,29 @@
+@@ -144,6 +187,29 @@
      startCore: "Start Core",
      restartSb: "Restart Singbox",
      closeSessions: "Disconnect User",
@@ -697,7 +1098,7 @@ diff -ruN
      title: "Login",
 diff -ruN
 --- a/src/locales/zhcn.ts	2026-09-16 08:54:08.000000000 +0800
-+++ b/src/locales/zhcn.ts	2026-10-04 15:02:02.826679000 +0800
++++ b/src/locales/zhcn.ts	2026-10-05 17:16:15.615887100 +0800
 @@ -42,8 +42,10 @@
      login: "登录",
      home: "主页",
@@ -709,7 +1110,7 @@ diff -ruN
      endpoints: "节点管理",
      clients: "用户管理",
      rules: "路由列表",
-@@ -53,6 +55,41 @@
+@@ -53,6 +55,46 @@
      admins: "管理员",
      settings: "设置",
    },
@@ -733,6 +1134,11 @@ diff -ruN
 +    delConfirm: "删除该中转(它的路由规则 + 落地出站)?",
 +    clearAll: "全部删除",
 +    clearAllConfirm: "删除全部中转(路由规则 + 落地出站)?此操作不可撤销。",
++    users: "用户",
++    manageUsers: "用户管理",
++    addUser: "添加用户",
++    usersHint: "用户要绑定在下面的入口入站上,流量才会走这个落地。这里可以直接增删改用户、出二维码;新增用户时会自动勾好入口入站。",
++    noUsers: "该中转的入口入站上还没有用户,请先添加一个。",
 +  },
 +  // 导出链接：把客户端的订阅地址 / 分享链接批量导出给外部工具
 +  exportLinks: {
@@ -751,7 +1157,7 @@ diff -ruN
    main: {
      tiles: "信息卡",
      gauges: "仪表板",
-@@ -105,6 +142,7 @@
+@@ -105,6 +147,7 @@
      rule: "规则",
      ruleset: "规则集",
      service: "服务",
@@ -759,7 +1165,7 @@ diff -ruN
      dnsserver: "DNS 服务器",
      dnsrule: "DNS规则",
      user: "用户",
-@@ -144,6 +182,29 @@
+@@ -144,6 +187,29 @@
      startCore: "启动内核",
      restartSb: "重启 Singbox",
      closeSessions: "断开该用户",
@@ -1013,8 +1419,8 @@ diff -ruN
 +}
 diff -ruN
 --- a/src/views/Relay.vue	1970-01-01 08:00:00.000000000 +0800
-+++ b/src/views/Relay.vue	2026-10-04 15:03:11.878405100 +0800
-@@ -0,0 +1,256 @@
++++ b/src/views/Relay.vue	2026-10-05 17:15:59.909040900 +0800
+@@ -0,0 +1,305 @@
 +<template>
 +  <!-- ======================================================================
 +    中转管理（Relay）
@@ -1024,17 +1430,25 @@ diff -ruN
 +      2. 一条「路由规则」route rule（action: route，inbound -> outbound）
 +    只要一条路由规则的 outbound 指向一个真实出站，它就是一个中转。
 +    本页面把这些组合从 config.route.rules + outbounds 里"算"出来展示，
-+    并提供向导式创建 / 单个删除 / 全部删除 / 落地测速 / 客户端二维码。
++    并提供向导式创建 / 单个删除 / 全部删除 / 落地测速 / 用户管理 / 客户端二维码。
 +
 +    后端无需任何新接口，全部复用：
 +      - api/save    object=config   （改路由规则，会触发核心重启）
 +      - api/save    object=outbounds（增删落地出站）
++      - api/save    object=clients  （增删改中转的用户，见 RelayUsers.vue）
 +      - api/checkOutbound ?tag=     （对落地出站做一次连通性测速）
 +    ====================================================================== -->
 +  <RelayWizard
 +    v-model="wizardModal"
 +    :visible="wizardModal"
 +    @close="wizardModal = false"
++  />
++  <!-- 中转的用户 = 入口入站上的客户端。用户弹窗见 RelayUsers.vue -->
++  <RelayUsers
++    :visible="users.visible"
++    :entry-tags="users.entryTags"
++    :name="users.name"
++    @close="users.visible = false"
 +  />
 +  <!-- 中转对用户是透明的：用户连的还是入口入站上的客户端，
 +       所以"中转的二维码"就是入口入站上那些客户端的二维码 -->
@@ -1103,6 +1517,25 @@ diff -ruN
 +            </v-col>
 +          </v-row>
 +          <v-row>
++            <!-- 用户：入口入站上的客户端。点数字进用户管理 -->
++            <v-col cols="4">{{ $t('relay.users') }}</v-col>
++            <v-col cols="8">
++              <v-chip
++                size="x-small"
++                label
++                class="ma-1"
++                :color="clientsForRelay(r).length === 0 ? 'warning' : 'primary'"
++                variant="tonal"
++                @click="openUsers(r)"
++              >
++                {{ clientsForRelay(r).length }}
++              </v-chip>
++              <v-icon size="small" icon="mdi-account-cog" @click="openUsers(r)">
++                <v-tooltip activator="parent" location="top" :text="$t('relay.manageUsers')" />
++              </v-icon>
++            </v-col>
++          </v-row>
++          <v-row>
 +            <!-- 落地测速：点速度计图标对落地出站发一次探测 -->
 +            <v-col cols="4">{{ $t('out.delay') }}</v-col>
 +            <v-col cols="8">
@@ -1121,6 +1554,11 @@ diff -ruN
 +        </v-card-text>
 +        <v-divider />
 +        <v-card-actions style="padding: 0;">
++          <!-- 用户管理：入口入站上的客户端（增删改 + 二维码） -->
++          <v-btn icon="mdi-account-multiple" @click="openUsers(r)">
++            <v-icon />
++            <v-tooltip activator="parent" location="top" :text="$t('relay.manageUsers')" />
++          </v-btn>
 +          <!-- 二维码：给出入口入站上客户端的链接（用户实际连接用的） -->
 +          <v-btn icon="mdi-qrcode" @click="showRelayQr(r)">
 +            <v-icon />
@@ -1155,8 +1593,11 @@ diff -ruN
 +import Data from '@/store/modules/data'
 +import HttpUtils from '@/plugins/httputil'
 +import RelayWizard from '@/layouts/modals/RelayWizard.vue'
++import RelayUsers from '@/layouts/modals/RelayUsers.vue'
 +import QrCode from '@/layouts/modals/QrCode.vue'
 +import ExportLinks from '@/layouts/modals/ExportLinks.vue'
++import { i18n } from '@/locales'
++import { push } from 'notivue'
 +import { computed, ref } from 'vue'
 +
 +const wizardModal = ref(false)   // 「添加中转」向导弹窗
@@ -1166,6 +1607,14 @@ diff -ruN
 +const clearConfirm = ref(false)  // 「全部删除」确认框
 +const clearLoading = ref(false)
 +const checkResults = ref<Record<string, any>>({}) // 落地测速结果，按出站 tag 索引
++
++// 用户管理弹窗（RelayUsers.vue）：按中转逐个打开
++const users = ref({ visible: false, name: '', entryTags: <string[]>[] })
++const openUsers = (r: any) => {
++  users.value.name = r.outbound
++  users.value.entryTags = [...r.inbounds]
++  users.value.visible = true
++}
 +
 +// 二维码弹窗：id 是客户端 id；入口入站上若只有一个客户端就直接出，
 +// 多个则先弹选择列表（picker）
@@ -1180,7 +1629,13 @@ diff -ruN
 +}
 +const showRelayQr = (r: any) => {
 +  const cls = clientsForRelay(r)
-+  if (cls.length === 0) return
++  if (cls.length === 0) {
++    // 入口入站上还没有用户 —— 以前这里直接 return，按钮点了毫无反应。
++    // 现在说明原因并把用户管理打开，让操作员当场建一个。
++    push.warning({ message: i18n.global.t('relay.noUsers') })
++    openUsers(r)
++    return
++  }
 +  if (cls.length === 1) {
 +    // 只有一个客户端：直接出它的二维码
 +    qrcode.value.id = cls[0].id

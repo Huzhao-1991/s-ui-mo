@@ -7,17 +7,25 @@
       2. 一条「路由规则」route rule（action: route，inbound -> outbound）
     只要一条路由规则的 outbound 指向一个真实出站，它就是一个中转。
     本页面把这些组合从 config.route.rules + outbounds 里"算"出来展示，
-    并提供向导式创建 / 单个删除 / 全部删除 / 落地测速 / 客户端二维码。
+    并提供向导式创建 / 单个删除 / 全部删除 / 落地测速 / 用户管理 / 客户端二维码。
 
     后端无需任何新接口，全部复用：
       - api/save    object=config   （改路由规则，会触发核心重启）
       - api/save    object=outbounds（增删落地出站）
+      - api/save    object=clients  （增删改中转的用户，见 RelayUsers.vue）
       - api/checkOutbound ?tag=     （对落地出站做一次连通性测速）
     ====================================================================== -->
   <RelayWizard
     v-model="wizardModal"
     :visible="wizardModal"
     @close="wizardModal = false"
+  />
+  <!-- 中转的用户 = 入口入站上的客户端。用户弹窗见 RelayUsers.vue -->
+  <RelayUsers
+    :visible="users.visible"
+    :entry-tags="users.entryTags"
+    :name="users.name"
+    @close="users.visible = false"
   />
   <!-- 中转对用户是透明的：用户连的还是入口入站上的客户端，
        所以"中转的二维码"就是入口入站上那些客户端的二维码 -->
@@ -86,6 +94,25 @@
             </v-col>
           </v-row>
           <v-row>
+            <!-- 用户：入口入站上的客户端。点数字进用户管理 -->
+            <v-col cols="4">{{ $t('relay.users') }}</v-col>
+            <v-col cols="8">
+              <v-chip
+                size="x-small"
+                label
+                class="ma-1"
+                :color="clientsForRelay(r).length === 0 ? 'warning' : 'primary'"
+                variant="tonal"
+                @click="openUsers(r)"
+              >
+                {{ clientsForRelay(r).length }}
+              </v-chip>
+              <v-icon size="small" icon="mdi-account-cog" @click="openUsers(r)">
+                <v-tooltip activator="parent" location="top" :text="$t('relay.manageUsers')" />
+              </v-icon>
+            </v-col>
+          </v-row>
+          <v-row>
             <!-- 落地测速：点速度计图标对落地出站发一次探测 -->
             <v-col cols="4">{{ $t('out.delay') }}</v-col>
             <v-col cols="8">
@@ -104,6 +131,11 @@
         </v-card-text>
         <v-divider />
         <v-card-actions style="padding: 0;">
+          <!-- 用户管理：入口入站上的客户端（增删改 + 二维码） -->
+          <v-btn icon="mdi-account-multiple" @click="openUsers(r)">
+            <v-icon />
+            <v-tooltip activator="parent" location="top" :text="$t('relay.manageUsers')" />
+          </v-btn>
           <!-- 二维码：给出入口入站上客户端的链接（用户实际连接用的） -->
           <v-btn icon="mdi-qrcode" @click="showRelayQr(r)">
             <v-icon />
@@ -138,8 +170,11 @@
 import Data from '@/store/modules/data'
 import HttpUtils from '@/plugins/httputil'
 import RelayWizard from '@/layouts/modals/RelayWizard.vue'
+import RelayUsers from '@/layouts/modals/RelayUsers.vue'
 import QrCode from '@/layouts/modals/QrCode.vue'
 import ExportLinks from '@/layouts/modals/ExportLinks.vue'
+import { i18n } from '@/locales'
+import { push } from 'notivue'
 import { computed, ref } from 'vue'
 
 const wizardModal = ref(false)   // 「添加中转」向导弹窗
@@ -149,6 +184,14 @@ const delLoading = ref(false)
 const clearConfirm = ref(false)  // 「全部删除」确认框
 const clearLoading = ref(false)
 const checkResults = ref<Record<string, any>>({}) // 落地测速结果，按出站 tag 索引
+
+// 用户管理弹窗（RelayUsers.vue）：按中转逐个打开
+const users = ref({ visible: false, name: '', entryTags: <string[]>[] })
+const openUsers = (r: any) => {
+  users.value.name = r.outbound
+  users.value.entryTags = [...r.inbounds]
+  users.value.visible = true
+}
 
 // 二维码弹窗：id 是客户端 id；入口入站上若只有一个客户端就直接出，
 // 多个则先弹选择列表（picker）
@@ -163,7 +206,13 @@ const clientsForRelay = (r: any): any[] => {
 }
 const showRelayQr = (r: any) => {
   const cls = clientsForRelay(r)
-  if (cls.length === 0) return
+  if (cls.length === 0) {
+    // 入口入站上还没有用户 —— 以前这里直接 return，按钮点了毫无反应。
+    // 现在说明原因并把用户管理打开，让操作员当场建一个。
+    push.warning({ message: i18n.global.t('relay.noUsers') })
+    openUsers(r)
+    return
+  }
   if (cls.length === 1) {
     // 只有一个客户端：直接出它的二维码
     qrcode.value.id = cls[0].id
