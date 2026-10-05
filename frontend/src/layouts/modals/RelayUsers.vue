@@ -2,14 +2,20 @@
   <!-- ======================================================================
     中转用户管理（RelayUsers）
     --------------------------------------------------------------------
-    一个中转的「用户」就是绑定在它入口入站上的客户端。这不是偷懒，是结构决定的：
-    中转本身不是独立数据模型，只是「一条 inbound -> outbound 的路由规则 +
-    一个落地出站」，而 sing-box 的用户认证发生在入口入站上。所以任何能连上
-    入口入站的客户端，它的流量必然按该入站的规则走这个落地 —— 两者是同一批对象。
+    一个中转的「用户」有两层：
+      1. 客户端 —— 绑定在入口入站上、能连进来的账号（数据在 clients 表）
+      2. 名单   —— 路由规则里的 auth_user，决定谁的流量真的走这个落地
+    按用户分流之后这两层不再自动重合：客户端挂在入口入站上只说明"它能连"，
+    要不要让它走这个落地由名单决定。本弹窗把两层放在同一张表里：
+    列出入口入站上的全部客户端，每行一个「走此中转」开关，开关直接增删
+    该用户的 auth_user 规则（一次 config 保存，会触发核心重启）。
 
-    因此本弹窗只做一件事：把「入口入站上的客户端」按中转视角列出来，并复用
-    全局的用户弹窗做增删改，不另造一套表单。新增时把入口入站预先勾上
-    （ClientModal 的 presetInbounds），省掉「建完还得回去改入站」这一步。
+    「整条入站」模式（规则没有 auth_user，即旧版形态）下名单不生效、
+    整个入站都走落地，所以开关锁定，顶部给一条说明和「转为按用户」按钮。
+
+    增删改仍然复用全局的用户弹窗（ClientModal），不另造表单。新增时把
+    入口入站预先勾上（ClientModal 的 presetInbounds），并在保存成功后
+    自动把新用户写进名单 —— 从这张卡片加人，意图就是让它走这个落地。
     ====================================================================== -->
   <ClientModal
     :id="editor.id"
@@ -84,6 +90,29 @@
         {{ $t('relay.usersHint') }}
       </v-card-subtitle>
       <v-card-text style="overflow-y: auto; max-height: 62vh; padding-top: 0;">
+        <!-- 整条入站模式：名单不生效，整个入站都走这个落地。
+             给一个显式的入口把它转成按用户，否则下面的开关没法用 -->
+        <v-alert
+          v-if="isLegacy"
+          type="info"
+          density="compact"
+          variant="tonal"
+          class="mt-3"
+        >
+          <div class="d-flex align-center">
+            <span>{{ $t('relay.legacyHint') }}</span>
+            <v-spacer />
+            <v-btn
+              size="x-small"
+              color="primary"
+              variant="outlined"
+              class="ms-2"
+              @click="$emit('convert')"
+            >
+              {{ $t('relay.convertUsers') }}
+            </v-btn>
+          </div>
+        </v-alert>
         <!-- 该中转的入口入站：下面列出的用户都挂在这些入站上 -->
         <v-row align="center">
           <v-col
@@ -132,6 +161,19 @@
               density="compact"
               hide-details
               @update:model-value="(val:any) => toggleEnable(item, !!val)"
+            />
+          </template>
+          <!-- 走此中转：开关直接增/删该用户的 auth_user 路由规则。
+               整条入站模式下整个入站都走，开关没有意义，锁定 -->
+          <template #item.routed="{ item }">
+            <v-switch
+              :model-value="isRouted(item)"
+              :loading="busyRule[item.name]"
+              :disabled="isLegacy || !!busyRule[item.name]"
+              color="success"
+              density="compact"
+              hide-details
+              @update:model-value="(val:any) => toggleRouted(item, !!val)"
             />
           </template>
           <!-- 该用户实际挂在这几个入站上；标出属于本中转的入口入站 -->
@@ -247,7 +289,7 @@ const props = defineProps<{
   name: string
 }>()
 
-const emit = defineEmits<{ close: [] }>()
+const emit = defineEmits<{ close: [], convert: [] }>()
 
 // v-dialog 关闭（点遮罩 / Esc）时也要通知父组件，否则父组件的 visible 还是 true
 const onDialogToggle = (v: boolean) => {
@@ -268,6 +310,78 @@ const users = computed((): ClientRow[] =>
     Array.isArray(c.inbounds) && c.inbounds.some((id: number) => entryIds.value.includes(id))
   ) as ClientRow[]
 )
+
+// ---------------------------------------------------------------------------
+// 名单层：本中转（落地出站 tag = props.name）的路由规则
+// ---------------------------------------------------------------------------
+// 指向本落地的全部 route 规则
+const relayRules = computed((): any[] => {
+  const rules: any[] = (Data().config as any)?.route?.rules || []
+  return rules.filter((r: any) => r && r.action === 'route' && r.outbound === props.name)
+})
+
+// 「整条入站」模式：这些规则没有 auth_user，覆盖到的入站不分用户全走
+const legacyTags = computed((): string[] => {
+  const s: string[] = []
+  relayRules.value.forEach((r: any) => {
+    if (Array.isArray(r.auth_user) && r.auth_user.length > 0) return
+    ;(Array.isArray(r.inbound) ? r.inbound : [r.inbound]).forEach((t: string) => {
+      if (!s.includes(t)) s.push(t)
+    })
+  })
+  return s
+})
+const isLegacy = computed(() => legacyTags.value.length > 0)
+
+// 名单：规则里出现过的用户名
+const listed = computed((): string[] => {
+  const s: string[] = []
+  relayRules.value.forEach((r: any) => {
+    if (Array.isArray(r.auth_user)) r.auth_user.forEach((u: string) => { if (!s.includes(u)) s.push(u) })
+  })
+  return s
+})
+
+// 某个客户端当前是否真的走这个落地：
+//   名单里有它 -> 走；或它挂的某个入站被「整条入站」规则覆盖 -> 也走
+const isRouted = (item: ClientRow): boolean =>
+  listed.value.includes(item.name) || tagsOf(item).some((t: string) => legacyTags.value.includes(t))
+
+// 开关「走此中转」= 增/删该用户的 auth_user 规则。一次 config 保存，
+// 会触发核心重启，所以每行有自己的 loading。
+const busyRule = ref<Record<string, boolean>>({})
+
+const toggleRouted = async (item: ClientRow, on: boolean) => {
+  if (isRouted(item) === on) return
+  busyRule.value = { ...busyRule.value, [item.name]: true }
+  try {
+    const config = JSON.parse(JSON.stringify(Data().config || {}))
+    const rules: any[] = config.route?.rules || []
+    if (on) {
+      rules.push({
+        // inbound 写本中转的全部入口入站：用户只能在自己绑定的入站上认证，
+        // 多写的永远匹配不上，但以后把用户挂到另一个入口入站时规则不用跟着改
+        inbound: [...props.entryTags],
+        auth_user: [item.name],
+        action: 'route',
+        outbound: props.name,
+      })
+    } else {
+      // 只删「只写了它一个」的规则；一条规则里写了多个用户时，把它从数组里摘掉
+      for (let i = rules.length - 1; i >= 0; i--) {
+        const r = rules[i]
+        if (!(r && r.action === 'route' && r.outbound === props.name && Array.isArray(r.auth_user))) continue
+        if (!r.auth_user.includes(item.name)) continue
+        if (r.auth_user.length === 1) rules.splice(i, 1)
+        else rules[i] = { ...r, auth_user: r.auth_user.filter((u: string) => u !== item.name) }
+      }
+    }
+    config.route.rules = rules
+    await Data().save('config', 'set', config)
+  } finally {
+    busyRule.value = { ...busyRule.value, [item.name]: false }
+  }
+}
 
 // 新增用户可以绑定的入站范围：与全局用户页一致（所有带 users 的入站），
 // 只是把本中转的入口入站预先勾上——比"只允许绑这几个"更灵活，
@@ -298,6 +412,7 @@ const tagsOf = (item: ClientRow): string[] =>
 
 const headers = [
   { title: i18n.global.t('client.name'), key: 'name' },
+  { title: i18n.global.t('relay.routed'), key: 'routed', width: 90, sortable: false },
   { title: i18n.global.t('enable'), key: 'enable', width: 60 },
   { title: i18n.global.t('client.group'), key: 'group' },
   { title: i18n.global.t('pages.inbounds'), key: 'inbounds', sortable: false },
@@ -309,19 +424,30 @@ const headers = [
 
 // ---- 新增 / 编辑：复用全局用户弹窗 --------------------------------------
 const editor = ref({ visible: false, id: 0 })
+// 打开弹窗前记下已有用户名，关掉时好认出"刚建的那个"
+const knownNames = ref<string[]>([])
 
 const addUser = () => {
+  knownNames.value = users.value.map((c: ClientRow) => c.name)
   editor.value.id = 0
   editor.value.visible = true
 }
 
 const editUser = (id: number) => {
+  knownNames.value = users.value.map((c: ClientRow) => c.name)
   editor.value.id = id
   editor.value.visible = true
 }
 
-const closeEditor = () => {
+const closeEditor = async () => {
   editor.value.visible = false
+  // 从这张卡片新建的用户自动纳入本中转 —— 会在这里加人，意图就是让它走这个落地。
+  // Data().save 成功后 store 已同步更新（setNewData），所以关弹窗时就能看到新客户端。
+  // 整条入站模式下 isRouted 本来就是 true，这里自然是空操作。
+  const fresh = users.value.filter((c: ClientRow) => !knownNames.value.includes(c.name))
+  for (const c of fresh) {
+    if (!isRouted(c)) await toggleRouted(c, true)
+  }
 }
 
 // ---- 二维码 ------------------------------------------------------------
@@ -357,6 +483,10 @@ const askDelUser = (item: ClientRow) => {
 
 const delUser = async () => {
   del.value.loading = true
+  // 名单里有它的先摘掉：客户端删了之后规则里会留下一个永远匹配不上的用户名。
+  // 走的是「整条入站」覆盖就不用动规则 —— 那种规则没有 auth_user，摘无可摘。
+  const row = users.value.find((c: ClientRow) => c.id === del.value.id)
+  if (row && listed.value.includes(row.name)) await toggleRouted(row, false)
   const ok = await Data().save('clients', 'del', del.value.id)
   del.value.loading = false
   if (ok) del.value.visible = false

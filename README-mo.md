@@ -91,13 +91,31 @@ SUI_AUTO=1 bash <(curl -Ls https://raw.githubusercontent.com/<你的仓库>/main
   （「我原来的节点全变成中转的 IP 了」就是这么做出来的），所以必须手动挑。
 - **删除** = 先删路由规则、再删落地出站（顺序不能反，否则规则会短暂指向不存在的出站）；支持全部删除。
 - 每张中转卡片可单独测速、可出示**入口入站上客户端的二维码**（中转对用户透明，用户连的还是入口节点）。
-- **中转自带用户管理**（`layouts/modals/RelayUsers.vue`）：卡片上显示该中转的用户数，
-  点开即可列出/新增/编辑/删除/出二维码，不必再切到「用户管理」页来回找。
-  用户的定义就是**绑定在该中转入口入站上的客户端** —— 这不是取巧：中转本身不是独立数据模型
-  （只是「路由规则 + 落地出站」），而用户认证发生在入口入站上，所以能连上入口入站的客户端，
-  流量必然按该入站的规则走这个落地，两者天然是同一批对象。
-  新增用户时入口入站会**预先勾好**（`Client.vue` 的 `presetInbounds`），省掉「建完再回去改入站」。
+- **建中转 = 在路由列表里生成「入站 + 用户 + 出站」三者关联的规则**。
+  向导里选完入口入站后会列出这些入站上的现有用户（默认全选），**每个选中的用户生成一条**
+  `{inbound:[入口入站], auth_user:[用户名], action:'route', outbound:落地}` 规则。
+  `auth_user` 是 sing-box 原生的「按用户匹配」，所以在「路由列表」页看得见、也改得动 ——
+  不再是一条只有 `inbound` 和 `outbound`、看不出用户维度的黑盒规则。
+  规则里的 `inbound` 写**全部**入口入站：用户只能在自己绑定的入站上认证，多写的永远匹配不上，
+  但以后把用户挂到另一个入口入站时规则不用跟着改。
+  一个用户都不选则退回旧形态 `{inbound, action:'route', outbound}`（整条入站转发），保证中转能用。
+- **中转卡片自带用户管理**（`layouts/modals/RelayUsers.vue`）：一张卡聚合一个落地的全部规则
+  （按 `outbound` 分组，不再是一条规则一张卡）。卡片显示名单内用户数；入口入站上挂着、
+  却不在名单里的用户用**黄色数字**单独标出 —— 按用户分流后这些人的流量不会走这个落地，
+  这是「入站页直接加用户」最容易踩的坑，必须让人看见。
+  用户弹窗里每个客户端一行「走此中转」开关，开关直接增/删该用户的 `auth_user` 规则
+  （一次 config 保存，触发核心重启）；在这里新增的用户会**自动纳入**名单。
+- **「整条入站」与「按用户」两种形态都认、可一键互转**：
+  带名单的规则只放名单内的用户过去；不带 `auth_user` 的规则（旧版形态）整个入站都走。
+  卡片上存在后者时会显示「整条入站」标记和 `mdi-account-convert` 按钮，
+  点一下就把它展开成「现有用户每人一条」，插回原位置。
+  旧版建的中转不会被自动改动 —— 页面照常识别和显示，转不转由操作员决定。
+- 新增用户时入口入站会**预先勾好**（`Client.vue` 的 `presetInbounds`），省掉「建完再回去改入站」。
   入口入站上还没有用户时点二维码，以前是静默无反应，现在会说明原因并直接把用户管理打开。
+- **已知取舍**（按用户分流是显式选择的语义）：名单是白名单，名单外走默认出站（直连）。
+  所以在「入站管理」页直接给入口入站加用户，它不会自动走中转 —— 卡片上的黄色数字会提醒。
+  另外，在「用户管理」页改名会让旧规则里的用户名失效（变成一条永远匹配不上的规则），
+  在中转卡片上重新打开开关即可补一条新的；改名前先把开关关掉最干净。
 - 附带「导出链接」弹窗：所有客户端的订阅 URL / 全部分享链接（明文或 Base64 整包），直接粘进 v2rayN 批量导入。
 
 ## 3. 相对原魔改版实现上的改进
@@ -177,18 +195,15 @@ apt-get install -y gcc musl-tools \
 
 ### 4.3 本次构建与验证记录
 
-本次（`1.6.3-mo3`）在 Windows 本机交叉编译，交付物在 Debian 12 VPS 上冒烟：
+本次（`1.6.3-mo4`）在 Windows 本机交叉编译，交付物在 Debian 12 VPS 上冒烟：
 
 | 项目 | 结果 |
 |---|---|
 | 工具链 | Go 1.26.8 + zig 0.14.1（`zig cc -target x86_64-linux-musl`），`CGO_ENABLED=1` |
 | 链接 | `-linkmode external -extldflags '-static -s'`，产出全静态 ELF |
 | 前端 | `npm run build` 通过（含 `vue-tsc --noEmit` 类型检查），917 modules，产物已嵌入 `web/html` |
-| 嵌入校验 | 运行时 JS 的 sha256 = `dae5028e…12b4`，与本地 `web/html/assets/5e4dcb973a1cc7a5.js` **逐字节一致** |
-| amd64 | `s-ui-linux-amd64.tar.gz` 35 761 975 B（内含 `sui` 102 422 408 B），**ELF 64-bit LSB, statically linked, stripped** |
-| 版本 | `api/updateInfo` → `currentVersion=1.6.3-mo3` |
-| 冒烟 | 13/13 通过：安装 → SHA256 校验 → 解包 → 随机账号/路径 → systemd enabled+active → 登录 / `api/settings` / `api/servers` / `api/updateInfo` / `api/testServer` |
-| 补丁 | `backend.patch` 23 文件，`frontend.patch` 17 文件，`verify.py` 校验「干净应用 + 与交付目录逐字节一致」通过 |
+| amd64 | `s-ui-linux-amd64.tar.gz` 35 762 270 B（内含 `sui` 102 422 408 B），ELF 64 位 x86-64 全静态已 strip（节表无 `.symtab`/`.debug_*`，无动态解释器路径） |
+| 版本 | 包内二进制确认含 `1.6.3-mo4`；`api/updateInfo` → `currentVersion=1.6.3-mo4` |
 
 早前的 `mo1` / `mo2` 在 Debian 12 / 1 核 / 973 MB 内存 VPS 上用 musl-gcc 构建并做过更完整的功能验证，
 其中后续版本仍然复用的结论：
@@ -338,7 +353,7 @@ rm -rf web/html && mkdir -p web/html && cp -r frontend/dist/* web/html/
 | `cmd/token.go` / `cmd/cmd.go` | `s-ui token` 子命令 |
 | `util/shadowsocks.go` | SS-2022 32 字节密钥方法 |
 | `config/config.go` | `PanelRepo` / `GetPanelRepo` |
-| `config/version` | `1.6.3-mo3` |
+| `config/version` | `1.6.3-mo4` |
 
 前端：
 

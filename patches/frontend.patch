@@ -275,20 +275,26 @@ diff -ruN
 +</script>
 diff -ruN
 --- a/src/layouts/modals/RelayUsers.vue	1970-01-01 08:00:00.000000000 +0800
-+++ b/src/layouts/modals/RelayUsers.vue	2026-10-05 17:15:35.920766800 +0800
-@@ -0,0 +1,364 @@
++++ b/src/layouts/modals/RelayUsers.vue	2026-10-05 19:29:26.484625600 +0800
+@@ -0,0 +1,494 @@
 +<template>
 +  <!-- ======================================================================
 +    中转用户管理（RelayUsers）
 +    --------------------------------------------------------------------
-+    一个中转的「用户」就是绑定在它入口入站上的客户端。这不是偷懒，是结构决定的：
-+    中转本身不是独立数据模型，只是「一条 inbound -> outbound 的路由规则 +
-+    一个落地出站」，而 sing-box 的用户认证发生在入口入站上。所以任何能连上
-+    入口入站的客户端，它的流量必然按该入站的规则走这个落地 —— 两者是同一批对象。
++    一个中转的「用户」有两层：
++      1. 客户端 —— 绑定在入口入站上、能连进来的账号（数据在 clients 表）
++      2. 名单   —— 路由规则里的 auth_user，决定谁的流量真的走这个落地
++    按用户分流之后这两层不再自动重合：客户端挂在入口入站上只说明"它能连"，
++    要不要让它走这个落地由名单决定。本弹窗把两层放在同一张表里：
++    列出入口入站上的全部客户端，每行一个「走此中转」开关，开关直接增删
++    该用户的 auth_user 规则（一次 config 保存，会触发核心重启）。
 +
-+    因此本弹窗只做一件事：把「入口入站上的客户端」按中转视角列出来，并复用
-+    全局的用户弹窗做增删改，不另造一套表单。新增时把入口入站预先勾上
-+    （ClientModal 的 presetInbounds），省掉「建完还得回去改入站」这一步。
++    「整条入站」模式（规则没有 auth_user，即旧版形态）下名单不生效、
++    整个入站都走落地，所以开关锁定，顶部给一条说明和「转为按用户」按钮。
++
++    增删改仍然复用全局的用户弹窗（ClientModal），不另造表单。新增时把
++    入口入站预先勾上（ClientModal 的 presetInbounds），并在保存成功后
++    自动把新用户写进名单 —— 从这张卡片加人，意图就是让它走这个落地。
 +    ====================================================================== -->
 +  <ClientModal
 +    :id="editor.id"
@@ -363,6 +369,29 @@ diff -ruN
 +        {{ $t('relay.usersHint') }}
 +      </v-card-subtitle>
 +      <v-card-text style="overflow-y: auto; max-height: 62vh; padding-top: 0;">
++        <!-- 整条入站模式：名单不生效，整个入站都走这个落地。
++             给一个显式的入口把它转成按用户，否则下面的开关没法用 -->
++        <v-alert
++          v-if="isLegacy"
++          type="info"
++          density="compact"
++          variant="tonal"
++          class="mt-3"
++        >
++          <div class="d-flex align-center">
++            <span>{{ $t('relay.legacyHint') }}</span>
++            <v-spacer />
++            <v-btn
++              size="x-small"
++              color="primary"
++              variant="outlined"
++              class="ms-2"
++              @click="$emit('convert')"
++            >
++              {{ $t('relay.convertUsers') }}
++            </v-btn>
++          </div>
++        </v-alert>
 +        <!-- 该中转的入口入站：下面列出的用户都挂在这些入站上 -->
 +        <v-row align="center">
 +          <v-col
@@ -411,6 +440,19 @@ diff -ruN
 +              density="compact"
 +              hide-details
 +              @update:model-value="(val:any) => toggleEnable(item, !!val)"
++            />
++          </template>
++          <!-- 走此中转：开关直接增/删该用户的 auth_user 路由规则。
++               整条入站模式下整个入站都走，开关没有意义，锁定 -->
++          <template #item.routed="{ item }">
++            <v-switch
++              :model-value="isRouted(item)"
++              :loading="busyRule[item.name]"
++              :disabled="isLegacy || !!busyRule[item.name]"
++              color="success"
++              density="compact"
++              hide-details
++              @update:model-value="(val:any) => toggleRouted(item, !!val)"
 +            />
 +          </template>
 +          <!-- 该用户实际挂在这几个入站上；标出属于本中转的入口入站 -->
@@ -526,7 +568,7 @@ diff -ruN
 +  name: string
 +}>()
 +
-+const emit = defineEmits<{ close: [] }>()
++const emit = defineEmits<{ close: [], convert: [] }>()
 +
 +// v-dialog 关闭（点遮罩 / Esc）时也要通知父组件，否则父组件的 visible 还是 true
 +const onDialogToggle = (v: boolean) => {
@@ -547,6 +589,78 @@ diff -ruN
 +    Array.isArray(c.inbounds) && c.inbounds.some((id: number) => entryIds.value.includes(id))
 +  ) as ClientRow[]
 +)
++
++// ---------------------------------------------------------------------------
++// 名单层：本中转（落地出站 tag = props.name）的路由规则
++// ---------------------------------------------------------------------------
++// 指向本落地的全部 route 规则
++const relayRules = computed((): any[] => {
++  const rules: any[] = (Data().config as any)?.route?.rules || []
++  return rules.filter((r: any) => r && r.action === 'route' && r.outbound === props.name)
++})
++
++// 「整条入站」模式：这些规则没有 auth_user，覆盖到的入站不分用户全走
++const legacyTags = computed((): string[] => {
++  const s: string[] = []
++  relayRules.value.forEach((r: any) => {
++    if (Array.isArray(r.auth_user) && r.auth_user.length > 0) return
++    ;(Array.isArray(r.inbound) ? r.inbound : [r.inbound]).forEach((t: string) => {
++      if (!s.includes(t)) s.push(t)
++    })
++  })
++  return s
++})
++const isLegacy = computed(() => legacyTags.value.length > 0)
++
++// 名单：规则里出现过的用户名
++const listed = computed((): string[] => {
++  const s: string[] = []
++  relayRules.value.forEach((r: any) => {
++    if (Array.isArray(r.auth_user)) r.auth_user.forEach((u: string) => { if (!s.includes(u)) s.push(u) })
++  })
++  return s
++})
++
++// 某个客户端当前是否真的走这个落地：
++//   名单里有它 -> 走；或它挂的某个入站被「整条入站」规则覆盖 -> 也走
++const isRouted = (item: ClientRow): boolean =>
++  listed.value.includes(item.name) || tagsOf(item).some((t: string) => legacyTags.value.includes(t))
++
++// 开关「走此中转」= 增/删该用户的 auth_user 规则。一次 config 保存，
++// 会触发核心重启，所以每行有自己的 loading。
++const busyRule = ref<Record<string, boolean>>({})
++
++const toggleRouted = async (item: ClientRow, on: boolean) => {
++  if (isRouted(item) === on) return
++  busyRule.value = { ...busyRule.value, [item.name]: true }
++  try {
++    const config = JSON.parse(JSON.stringify(Data().config || {}))
++    const rules: any[] = config.route?.rules || []
++    if (on) {
++      rules.push({
++        // inbound 写本中转的全部入口入站：用户只能在自己绑定的入站上认证，
++        // 多写的永远匹配不上，但以后把用户挂到另一个入口入站时规则不用跟着改
++        inbound: [...props.entryTags],
++        auth_user: [item.name],
++        action: 'route',
++        outbound: props.name,
++      })
++    } else {
++      // 只删「只写了它一个」的规则；一条规则里写了多个用户时，把它从数组里摘掉
++      for (let i = rules.length - 1; i >= 0; i--) {
++        const r = rules[i]
++        if (!(r && r.action === 'route' && r.outbound === props.name && Array.isArray(r.auth_user))) continue
++        if (!r.auth_user.includes(item.name)) continue
++        if (r.auth_user.length === 1) rules.splice(i, 1)
++        else rules[i] = { ...r, auth_user: r.auth_user.filter((u: string) => u !== item.name) }
++      }
++    }
++    config.route.rules = rules
++    await Data().save('config', 'set', config)
++  } finally {
++    busyRule.value = { ...busyRule.value, [item.name]: false }
++  }
++}
 +
 +// 新增用户可以绑定的入站范围：与全局用户页一致（所有带 users 的入站），
 +// 只是把本中转的入口入站预先勾上——比"只允许绑这几个"更灵活，
@@ -577,6 +691,7 @@ diff -ruN
 +
 +const headers = [
 +  { title: i18n.global.t('client.name'), key: 'name' },
++  { title: i18n.global.t('relay.routed'), key: 'routed', width: 90, sortable: false },
 +  { title: i18n.global.t('enable'), key: 'enable', width: 60 },
 +  { title: i18n.global.t('client.group'), key: 'group' },
 +  { title: i18n.global.t('pages.inbounds'), key: 'inbounds', sortable: false },
@@ -588,19 +703,30 @@ diff -ruN
 +
 +// ---- 新增 / 编辑：复用全局用户弹窗 --------------------------------------
 +const editor = ref({ visible: false, id: 0 })
++// 打开弹窗前记下已有用户名，关掉时好认出"刚建的那个"
++const knownNames = ref<string[]>([])
 +
 +const addUser = () => {
++  knownNames.value = users.value.map((c: ClientRow) => c.name)
 +  editor.value.id = 0
 +  editor.value.visible = true
 +}
 +
 +const editUser = (id: number) => {
++  knownNames.value = users.value.map((c: ClientRow) => c.name)
 +  editor.value.id = id
 +  editor.value.visible = true
 +}
 +
-+const closeEditor = () => {
++const closeEditor = async () => {
 +  editor.value.visible = false
++  // 从这张卡片新建的用户自动纳入本中转 —— 会在这里加人，意图就是让它走这个落地。
++  // Data().save 成功后 store 已同步更新（setNewData），所以关弹窗时就能看到新客户端。
++  // 整条入站模式下 isRouted 本来就是 true，这里自然是空操作。
++  const fresh = users.value.filter((c: ClientRow) => !knownNames.value.includes(c.name))
++  for (const c of fresh) {
++    if (!isRouted(c)) await toggleRouted(c, true)
++  }
 +}
 +
 +// ---- 二维码 ------------------------------------------------------------
@@ -636,6 +762,10 @@ diff -ruN
 +
 +const delUser = async () => {
 +  del.value.loading = true
++  // 名单里有它的先摘掉：客户端删了之后规则里会留下一个永远匹配不上的用户名。
++  // 走的是「整条入站」覆盖就不用动规则 —— 那种规则没有 auth_user，摘无可摘。
++  const row = users.value.find((c: ClientRow) => c.id === del.value.id)
++  if (row && listed.value.includes(row.name)) await toggleRouted(row, false)
 +  const ok = await Data().save('clients', 'del', del.value.id)
 +  del.value.loading = false
 +  if (ok) del.value.visible = false
@@ -643,8 +773,8 @@ diff -ruN
 +</script>
 diff -ruN
 --- a/src/layouts/modals/RelayWizard.vue	1970-01-01 08:00:00.000000000 +0800
-+++ b/src/layouts/modals/RelayWizard.vue	2026-10-04 15:03:11.912314100 +0800
-@@ -0,0 +1,212 @@
++++ b/src/layouts/modals/RelayWizard.vue	2026-10-05 19:29:26.477647800 +0800
+@@ -0,0 +1,261 @@
 +<template>
 +  <!-- ======================================================================
 +    添加中转向导（RelayWizard）
@@ -655,8 +785,12 @@ diff -ruN
 +         - 其它协议（vless/vmess/trojan/ss/hysteria2/tuic...）调后端
 +           api/linkConvert 转换（与出站页「从链接导入」同一接口）
 +      2. 起一个不冲突的 tag，把出站存进 outbounds
-+      3. 往 config.route.rules 追加一条 {inbound: [...], action: route,
-+         outbound: tag} 并保存（保存 config 会触发核心重启，出站与路由一起生效）
++      3. 往 config.route.rules 追加路由规则并保存（保存 config 会触发核心重启，
++         出站与路由一起生效）。规则按用户拆开，每个选中的用户一条：
++           {inbound:[入口入站], auth_user:[用户名], action:'route', outbound:tag}
++         这样「入站 + 用户 + 出站」三项在「路由列表」页是关联在一起、看得见
++         也改得动的。一个用户都没选则退回旧形态 {inbound, action:'route',
++         outbound}（整条入站转发），保证中转建出来就能用。
 +      4. 最后调 api/checkOutbound 探测落地连通性，把结果反馈给用户
 +    ====================================================================== -->
 +  <v-dialog transition="dialog-bottom-transition" width="640">
@@ -699,6 +833,22 @@ diff -ruN
 +                chips
 +              />
 +            </v-col>
++            <v-col cols="12">
++              <!-- 走这个落地的用户：多选，默认 = 所选入口入站上的全部现有客户端。
++                   每个用户生成一条带 auth_user 的路由规则，在路由列表里逐条可见；
++                   一个都不选则退回「整条入站转发」。 -->
++              <v-select
++                :label="$t('relay.pickUsers')"
++                :hint="userOptions.length > 0 ? $t('relay.pickUsersHint') : $t('relay.pickUsersEmpty')"
++                persistent-hint
++                :items="userOptions"
++                v-model="form.users"
++                :disabled="userOptions.length === 0"
++                multiple
++                chips
++                clearable
++              />
++            </v-col>
 +          </v-row>
 +          <!-- 创建结果提示（成功/落地测试未通过） -->
 +          <v-row v-if="result">
@@ -732,7 +882,7 @@ diff -ruN
 +  data() {
 +    return {
 +      loading: false,
-+      form: { link: '', name: '', inbounds: <string[]>[] },
++      form: { link: '', name: '', inbounds: <string[]>[], users: <string[]>[] },
 +      result: <any>null,
 +    }
 +  },
@@ -740,6 +890,11 @@ diff -ruN
 +    // 每次打开弹窗都重置表单，避免上一次的输入残留
 +    visible(v: boolean) {
 +      if (v) this.reset()
++    },
++    // 换了入口入站，可选的用户集合就变了：重置成「全选」。
++    // 不做增量保留 —— 换入口通常意味着想重新挑一遍用户。
++    'form.inbounds'() {
++      this.form.users = [...this.userOptions]
 +    },
 +  },
 +  computed: {
@@ -750,13 +905,23 @@ diff -ruN
 +        .filter((i: any) => i.tag && i.users)
 +        .map((i: any) => i.tag)
 +    },
++    // 所选入口入站上已有的客户端。默认全部选中：
++    // 这些用户本来就在这几个入站上，建中转就是想让它们走这个落地。
++    userOptions(): string[] {
++      const ids = (Data().inbounds || [])
++        .filter((i: any) => this.form.inbounds.includes(i.tag))
++        .map((i: any) => i.id)
++      return (Data().clients || [])
++        .filter((c: any) => Array.isArray(c.inbounds) && c.inbounds.some((id: number) => ids.includes(id)))
++        .map((c: any) => c.name)
++    },
 +  },
 +  methods: {
 +    reset() {
 +      // 默认一个入口都不选。路由规则会把选中入站的出口整个改道到落地，
 +      // 如果默认全选，会把现有所有节点一次性都推到落地 IP 后面
 +      // （表现为"我原来的节点全变成中转的 IP 了"）。让用户自己挑。
-+      this.form = { link: '', name: '', inbounds: [] }
++      this.form = { link: '', name: '', inbounds: [], users: [] }
 +      this.result = null
 +      this.loading = false
 +    },
@@ -829,14 +994,28 @@ diff -ruN
 +        // 3) 保存落地出站。
 +        if (!await Data().save('outbounds', 'new', outbound)) return
 +
-+        // 4) 追加路由规则：入口入站 -> 该落地出站。
++        // 4) 追加路由规则。按用户分流：每个选中的用户一条
++        //    {inbound, auth_user:[用户名], action:'route', outbound}。
++        //    inbound 写本中转的全部入口入站：用户只能在自己绑定的入站上认证，
++        //    多写的永远匹配不上，但以后把用户挂到另一个入口入站时规则不用跟着改。
++        //    一个用户都没选则退回旧形态（整条入站转发，不限用户）——
++        //    不然建出来的中转一条规则都没有，页面也不会显示它。
 +        const config = JSON.parse(JSON.stringify(Data().config || {}))
 +        if (!config.route) config.route = {}
 +        if (!Array.isArray(config.route.rules)) config.route.rules = []
-+        config.route.rules.push({ inbound: [...this.form.inbounds], action: 'route', outbound: tag })
++        const entryTags = [...this.form.inbounds]
++        const legacy = this.form.users.length === 0
++        if (legacy) {
++          config.route.rules.push({ inbound: entryTags, action: 'route', outbound: tag })
++        } else {
++          this.form.users.forEach((name: string) => {
++            config.route.rules.push({ inbound: [...entryTags], auth_user: [name], action: 'route', outbound: tag })
++          })
++        }
 +
 +        // 5) 保存完整 config（触发核心重启，出站与路由同时生效）。
 +        if (!await Data().save('config', 'set', config)) return
++        if (legacy) push.info({ message: i18n.global.t('relay.legacyFallback') })
 +
 +        // 6) 探测落地连通性，把结果展示在弹窗里。
 +        const test = await HttpUtils.get<{ OK: boolean; Delay?: number; Error?: string }>('api/checkOutbound', { tag })
@@ -999,7 +1178,7 @@ diff -ruN
 +</script>
 diff -ruN
 --- a/src/locales/en.ts	2026-09-16 08:54:08.000000000 +0800
-+++ b/src/locales/en.ts	2026-10-05 17:16:15.632842000 +0800
++++ b/src/locales/en.ts	2026-10-05 19:29:26.490607100 +0800
 @@ -42,8 +42,10 @@
      login: "Login",
      home: "Home",
@@ -1011,7 +1190,7 @@ diff -ruN
      endpoints: "Endpoints",
      clients: "Clients",
      rules: "Rules",
-@@ -53,6 +55,46 @@
+@@ -53,6 +55,58 @@
      admins: "Admins",
      settings: "Settings",
    },
@@ -1038,8 +1217,20 @@ diff -ruN
 +    users: "Users",
 +    manageUsers: "Manage users",
 +    addUser: "Add user",
-+    usersHint: "A user reaches this landing only when it is bound to one of the entry inbound(s) below. Add, edit, delete or show a QR code right here; a new user gets the entry inbound(s) pre-ticked.",
++    usersHint: "A user reaches this landing only when it is bound to one of the entry inbound(s) below AND listed in the relay's route rule. Toggle \"Relayed\" to include or exclude a user; a new user added here is included automatically.",
 +    noUsers: "No user is bound to this relay's entry inbound yet.",
++    pickUsers: "Users to relay",
++    pickUsersHint: "One route rule per user ({inbound, auth_user, outbound}), visible and editable on the Rules page. Pre-selected: every client already on the entry inbound(s).",
++    pickUsersEmpty: "The selected inbound(s) have no users yet — the relay will forward the whole inbound instead.",
++    legacyFallback: "No user selected — forwarding the whole inbound (not per-user). Convert it later from the relay card.",
++    routed: "Relayed",
++    wholeInbound: "whole inbound",
++    wholeInboundHint: "This relay has a rule without a user list, so the entire inbound is forwarded regardless of users.",
++    legacyHint: "This relay forwards the whole inbound (no user list). Convert it to per-user rules to decide who goes through.",
++    convertUsers: "Split into per-user rules",
++    convertNoUser: "No user to split for — add a user first.",
++    converted: "Converted to per-user rules",
++    unlisted: "Bound to the entry inbound but not in the relay's user list, so their traffic bypasses this relay:",
 +  },
 +  // Export links: bulk-export client subscriptions / share links
 +  exportLinks: {
@@ -1058,7 +1249,7 @@ diff -ruN
    main: {
      tiles: "Tiles",
      gauges: "Gauges",
-@@ -105,6 +147,7 @@
+@@ -105,6 +159,7 @@
      rule: "Rule",
      ruleset: "Ruleset",
      service: "Service",
@@ -1066,7 +1257,7 @@ diff -ruN
      dnsserver: "DNS Server",
      dnsrule: "DNS Rule",
      user: "User",
-@@ -144,6 +187,29 @@
+@@ -144,6 +199,29 @@
      startCore: "Start Core",
      restartSb: "Restart Singbox",
      closeSessions: "Disconnect User",
@@ -1098,7 +1289,7 @@ diff -ruN
      title: "Login",
 diff -ruN
 --- a/src/locales/zhcn.ts	2026-09-16 08:54:08.000000000 +0800
-+++ b/src/locales/zhcn.ts	2026-10-05 17:16:15.615887100 +0800
++++ b/src/locales/zhcn.ts	2026-10-05 19:29:26.496621500 +0800
 @@ -42,8 +42,10 @@
      login: "登录",
      home: "主页",
@@ -1110,7 +1301,7 @@ diff -ruN
      endpoints: "节点管理",
      clients: "用户管理",
      rules: "路由列表",
-@@ -53,6 +55,46 @@
+@@ -53,6 +55,58 @@
      admins: "管理员",
      settings: "设置",
    },
@@ -1137,8 +1328,20 @@ diff -ruN
 +    users: "用户",
 +    manageUsers: "用户管理",
 +    addUser: "添加用户",
-+    usersHint: "用户要绑定在下面的入口入站上,流量才会走这个落地。这里可以直接增删改用户、出二维码;新增用户时会自动勾好入口入站。",
++    usersHint: "用户要绑定在下面的入口入站上、并且在这个中转的路由规则名单里,流量才会走这个落地。用「走此中转」开关把用户纳入或移出;在这里新增的用户会自动纳入。",
 +    noUsers: "该中转的入口入站上还没有用户,请先添加一个。",
++    pickUsers: "走此中转的用户",
++    pickUsersHint: "每个用户生成一条路由规则(入站+用户+出站),在「路由列表」里看得见、改得动。默认勾上所选入站上的全部用户。",
++    pickUsersEmpty: "所选入站上还没有用户——将按整条入站转发,之后可一键转为按用户。",
++    legacyFallback: "未选择用户,已按整条入站转发(不限用户);以后可在中转卡片上一键转为按用户。",
++    routed: "走此中转",
++    wholeInbound: "整条入站",
++    wholeInboundHint: "该中转存在不带用户名单的规则,整个入站的流量不分用户都走这个落地。",
++    legacyHint: "该中转目前按整条入站转发(不限用户)。转成按用户后,名单里的人才走这个落地。",
++    convertUsers: "转为按用户",
++    convertNoUser: "没有可拆分的用户,请先添加一个。",
++    converted: "已转为按用户规则",
++    unlisted: "挂在入口入站上、但不在名单里(流量不会走这个中转):",
 +  },
 +  // 导出链接：把客户端的订阅地址 / 分享链接批量导出给外部工具
 +  exportLinks: {
@@ -1157,7 +1360,7 @@ diff -ruN
    main: {
      tiles: "信息卡",
      gauges: "仪表板",
-@@ -105,6 +147,7 @@
+@@ -105,6 +159,7 @@
      rule: "规则",
      ruleset: "规则集",
      service: "服务",
@@ -1165,7 +1368,7 @@ diff -ruN
      dnsserver: "DNS 服务器",
      dnsrule: "DNS规则",
      user: "用户",
-@@ -144,6 +187,29 @@
+@@ -144,6 +199,29 @@
      startCore: "启动内核",
      restartSb: "重启 Singbox",
      closeSessions: "断开该用户",
@@ -1419,16 +1622,28 @@ diff -ruN
 +}
 diff -ruN
 --- a/src/views/Relay.vue	1970-01-01 08:00:00.000000000 +0800
-+++ b/src/views/Relay.vue	2026-10-05 17:15:59.909040900 +0800
-@@ -0,0 +1,305 @@
++++ b/src/views/Relay.vue	2026-10-05 19:29:26.471663900 +0800
+@@ -0,0 +1,422 @@
 +<template>
 +  <!-- ======================================================================
 +    中转管理（Relay）
 +    --------------------------------------------------------------------
 +    「中转」在本面板里不是一个独立的数据模型，而是一组既有对象的组合：
 +      1. 一个「落地出站」outbound（流量最终从哪个节点出去）
-+      2. 一条「路由规则」route rule（action: route，inbound -> outbound）
-+    只要一条路由规则的 outbound 指向一个真实出站，它就是一个中转。
++      2. 一组「路由规则」route rule（action: route，inbound + auth_user -> outbound）
++    只要一条路由规则的 outbound 指向一个真实出站，它就属于一个中转。
++
++    规则有两种形态，本页面两种都认：
++      按用户   {inbound, auth_user:[用户名], action:'route', outbound}
++               只有列出的用户走这个落地 —— 这就是「入站 + 用户 + 出站」
++               三项在路由列表里关联起来的形态，在「路由列表」页看得见、改得动。
++      整条入站 {inbound, action:'route', outbound}
++               不限用户，整个入站的流量都走（旧版只有这一种；现在只在
++               「建中转时一个用户都没选」时作为回退，也可一键转成按用户）。
++
++    因为按用户分流时一个落地对应多条规则，本页面把规则按 outbound 聚合成
++    一张卡，而不是一条规则一张卡。
++
 +    本页面把这些组合从 config.route.rules + outbounds 里"算"出来展示，
 +    并提供向导式创建 / 单个删除 / 全部删除 / 落地测速 / 用户管理 / 客户端二维码。
 +
@@ -1443,12 +1658,14 @@ diff -ruN
 +    :visible="wizardModal"
 +    @close="wizardModal = false"
 +  />
-+  <!-- 中转的用户 = 入口入站上的客户端。用户弹窗见 RelayUsers.vue -->
++  <!-- 中转的用户 = 入口入站上的客户端 + 路由规则里的 auth_user 名单。
++       用户弹窗见 RelayUsers.vue；「转为按用户」在弹窗里发起、由本页统一执行 -->
 +  <RelayUsers
 +    :visible="users.visible"
 +    :entry-tags="users.entryTags"
 +    :name="users.name"
 +    @close="users.visible = false"
++    @convert="convertByName(users.name)"
 +  />
 +  <!-- 中转对用户是透明的：用户连的还是入口入站上的客户端，
 +       所以"中转的二维码"就是入口入站上那些客户端的二维码 -->
@@ -1517,18 +1734,44 @@ diff -ruN
 +            </v-col>
 +          </v-row>
 +          <v-row>
-+            <!-- 用户：入口入站上的客户端。点数字进用户管理 -->
++            <!-- 用户：名单里的（auth_user）数一数；没被任何规则覆盖到的用黄色另计。
++                 点数字进用户管理，在那里可以逐个纳入/移出 -->
 +            <v-col cols="4">{{ $t('relay.users') }}</v-col>
 +            <v-col cols="8">
 +              <v-chip
 +                size="x-small"
 +                label
 +                class="ma-1"
-+                :color="clientsForRelay(r).length === 0 ? 'warning' : 'primary'"
++                :color="r.users.length === 0 ? 'warning' : 'primary'"
 +                variant="tonal"
 +                @click="openUsers(r)"
 +              >
-+                {{ clientsForRelay(r).length }}
++                {{ r.users.length }}
++              </v-chip>
++              <v-chip
++                v-if="unlistedForRelay(r).length > 0"
++                size="x-small"
++                label
++                color="warning"
++                variant="outlined"
++                class="ma-1"
++                @click="openUsers(r)"
++              >
++                <v-icon start size="x-small" icon="mdi-alert" />{{ unlistedForRelay(r).length }}
++                <v-tooltip activator="parent" location="top" max-width="320">
++                  {{ $t('relay.unlisted') + ' ' + unlistedForRelay(r).join(', ') }}
++                </v-tooltip>
++              </v-chip>
++              <v-chip
++                v-if="r.legacy.length > 0"
++                size="x-small"
++                label
++                color="info"
++                variant="tonal"
++                class="ma-1"
++              >
++                {{ $t('relay.wholeInbound') }}
++                <v-tooltip activator="parent" location="top" max-width="320">{{ $t('relay.wholeInboundHint') }}</v-tooltip>
 +              </v-chip>
 +              <v-icon size="small" icon="mdi-account-cog" @click="openUsers(r)">
 +                <v-tooltip activator="parent" location="top" :text="$t('relay.manageUsers')" />
@@ -1558,6 +1801,11 @@ diff -ruN
 +          <v-btn icon="mdi-account-multiple" @click="openUsers(r)">
 +            <v-icon />
 +            <v-tooltip activator="parent" location="top" :text="$t('relay.manageUsers')" />
++          </v-btn>
++          <!-- 「整条入站」模式才有：把它展开成每个用户一条规则 -->
++          <v-btn v-if="r.legacy.length > 0" icon="mdi-account-convert" :loading="converting" @click="convertToUsers(r)">
++            <v-icon />
++            <v-tooltip activator="parent" location="top" :text="$t('relay.convertUsers')" />
 +          </v-btn>
 +          <!-- 二维码：给出入口入站上客户端的链接（用户实际连接用的） -->
 +          <v-btn icon="mdi-qrcode" @click="showRelayQr(r)">
@@ -1627,6 +1875,23 @@ diff -ruN
 +  const entryIds = (Data().inbounds || []).filter((i: any) => r.inbounds.includes(i.tag)).map((i: any) => i.id)
 +  return (Data().clients || []).filter((c: any) => Array.isArray(c.inbounds) && c.inbounds.some((id: number) => entryIds.includes(id)))
 +}
++
++// 客户端挂在哪些入站上（tag 形式）。id -> tag 的反查每次都做一遍有点费，
++// 但入站数量是个位数到十几条，不值得为它建缓存。
++const inboundTagsOf = (c: any): string[] =>
++  (c.inbounds || [])
++    .map((id: number) => (Data().inbounds || []).find((i: any) => i.id == id)?.tag)
++    .filter((t: any): t is string => !!t)
++
++// 挂在入口入站上、却没有任何规则把它送到这个落地的客户端。
++// 按用户分流之后这些用户的流量不会走中转（落到默认出站），卡片必须让人看见，
++// 否则「我在入站页加了个用户怎么不走中转」这种问题无从查起。
++// 被「整条入站」规则覆盖到的不算 —— 那种规则不限用户，走得到。
++const unlistedForRelay = (r: any): string[] =>
++  clientsForRelay(r)
++    .filter((c: any) => !r.users.includes(c.name))
++    .filter((c: any) => !inboundTagsOf(c).some((t: string) => r.legacy.includes(t)))
++    .map((c: any) => c.name)
 +const showRelayQr = (r: any) => {
 +  const cls = clientsForRelay(r)
 +  if (cls.length === 0) {
@@ -1655,28 +1920,83 @@ diff -ruN
 +// ---------------------------------------------------------------------------
 +// 中转列表（计算属性）：每次 config / outbounds 变化都会重算。
 +// 判定标准：一条 route 规则的 action === 'route' 且 outbound 指向真实出站。
-+// ---------------------------------------------------------------------------
++//
++// 按用户分流时同一个落地出站对应多条规则（每用户一条），所以这里按 outbound
++// 聚合：一张卡 = 一个落地出站 + 它的全部入口入站 + 它的用户名单。
++// ------------------------------------------------------------------------
 +const relays = computed((): any[] => {
 +  const config: any = Data().config || {}
 +  const rules: any[] = config.route?.rules || []
 +  const obs: any[] = Data().outbounds || []
-+  const result: any[] = []
++  const byTag = new Map<string, any>()
++  const order: string[] = []
 +  rules.forEach((rule: any) => {
-+    if (rule && rule.action === 'route' && rule.outbound && rule.inbound) {
-+      const ob = obs.find((o: any) => o.tag === rule.outbound)
-+      if (ob) {
-+        result.push({
-+          outbound: ob.tag,
-+          type: ob.type,
-+          server: ob.server ?? '-',
-+          // 规则里的 inbound 可能是字符串或数组，统一成数组展示
-+          inbounds: Array.isArray(rule.inbound) ? rule.inbound : [rule.inbound],
-+        })
-+      }
++    if (!(rule && rule.action === 'route' && rule.outbound && rule.inbound)) return
++    const ob = obs.find((o: any) => o.tag === rule.outbound)
++    if (!ob) return
++    let g = byTag.get(rule.outbound)
++    if (!g) {
++      g = { outbound: ob.tag, type: ob.type, server: ob.server ?? '-', inbounds: <string[]>[], users: <string[]>[], legacy: <string[]>[] }
++      byTag.set(rule.outbound, g)
++      order.push(rule.outbound)
++    }
++    // 规则里的 inbound 可能是字符串或数组，统一成数组
++    const inb: string[] = Array.isArray(rule.inbound) ? rule.inbound : [rule.inbound]
++    inb.forEach((t: string) => { if (!g.inbounds.includes(t)) g.inbounds.push(t) })
++    if (Array.isArray(rule.auth_user) && rule.auth_user.length > 0) {
++      // 按用户：这条规则只放这些用户过去
++      rule.auth_user.forEach((u: string) => { if (!g.users.includes(u)) g.users.push(u) })
++    } else {
++      // 整条入站：没有 auth_user，这个入站的流量不分用户全走
++      inb.forEach((t: string) => { if (!g.legacy.includes(t)) g.legacy.push(t) })
 +    }
 +  })
-+  return result
++  return order.map((t: string) => byTag.get(t))
 +})
++
++// ---------------------------------------------------------------------------
++// 把「整条入站」的规则展开成「每个用户一条」。
++// 展开 = 给该落地入口入站上的每个现有客户端各生成一条 auth_user 规则，
++// 插到原来那条规则的位置上，再把原来的整条入站规则删掉。一次保存。
++//
++// 展开之后新加的用户必须在中转卡片上纳入，否则不会走这个落地 —— 这是
++// 按用户分流的代价，卡片上的黄色数字就是干这个提醒的。
++// 没有客户端可展开时直接拒绝：展开成零条规则等于把这个中转拆没了。
++// ---------------------------------------------------------------------------
++const converting = ref(false)
++const convertToUsers = async (r: any) => {
++  const cls = clientsForRelay(r)
++  if (cls.length === 0) {
++    push.warning({ message: i18n.global.t('relay.convertNoUser') })
++    return
++  }
++  converting.value = true
++  const config = JSON.parse(JSON.stringify(Data().config || {}))
++  const rules: any[] = config.route?.rules || []
++  const isRelayRule = (rule: any) => rule && rule.action === 'route' && rule.outbound === r.outbound
++  const fresh: any[] = cls.map((c: any) => ({
++    // inbound 写本中转的全部入口入站：用户只能在自己绑定的入站上认证，
++    // 多写的那些永远匹配不上，但以后把用户挂到另一个入口入站时规则不用跟着改
++    inbound: [...r.inbounds],
++    auth_user: [c.name],
++    action: 'route',
++    outbound: r.outbound,
++  }))
++  const at = rules.findIndex(isRelayRule)
++  const kept = rules.filter((rule: any) => !isRelayRule(rule))
++  kept.splice(at < 0 ? kept.length : at, 0, ...fresh)
++  config.route.rules = kept
++  await Data().save('config', 'set', config)
++  converting.value = false
++  push.success({ title: i18n.global.t('success'), message: i18n.global.t('relay.converted') + ' (' + fresh.length + ')' })
++}
++
++// 用户管理弹窗按出站 tag 打开；RelayUsers 里做完「转为按用户」后发 convert
++// 事件回来，由这里统一执行，避免两份一样的规则改写逻辑。
++const convertByName = (tag: string) => {
++  const r = relays.value.find((x: any) => x.outbound === tag)
++  if (r) convertToUsers(r)
++}
 +
 +// 落地测速：与出站页同一接口（api/checkOutbound），15 秒内返回延迟或错误
 +const checkOutbound = async (tag: string) => {
