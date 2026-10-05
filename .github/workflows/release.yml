@@ -1,14 +1,22 @@
 name: Release S-UI
 
+# Manual only. Upstream fires this on every tag and on release publish, which
+# assumes the matrix below is the thing that produces the deliverable. In this
+# fork it is not: install.sh is shipped separately and pulls exactly one
+# archive (s-ui-linux-amd64.tar.gz) plus SHA256SUMS from the GitHub Release,
+# and it resolves the version through releases/latest.
+#
+# That last detail is what makes the upstream triggers actively harmful. The
+# publish job marks its release `prerelease: true`, and releases/latest skips
+# prereleases -- so a tag-triggered run would hide the release we published by
+# hand and send install.sh back to the previous version, silently. It would
+# also spend an hour building seven platforms, two of which need the Chromium
+# toolchain, for archives nobody downloads.
+#
+# Keep the workflow for a deliberate manual run; let the release be published
+# from the built artifact instead.
 on:
   workflow_dispatch:
-  release:
-    types: [published]
-  push:
-    branches:
-      - main
-    tags:
-      - "*"
 
 permissions:
   contents: read
