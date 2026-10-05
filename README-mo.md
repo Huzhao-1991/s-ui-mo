@@ -201,8 +201,8 @@ apt-get install -y gcc musl-tools \
 |---|---|
 | 工具链 | Go 1.26.8 + zig 0.14.1（`zig cc -target x86_64-linux-musl`），`CGO_ENABLED=1` |
 | 链接 | `-linkmode external -extldflags '-static -s'`，产出全静态 ELF |
-| 前端 | `npm run build` 通过（含 `vue-tsc --noEmit` 类型检查），917 modules，产物已嵌入 `web/html` |
-| amd64 | `s-ui-linux-amd64.tar.gz` 35 762 270 B（内含 `sui` 102 422 408 B），ELF 64 位 x86-64 全静态已 strip（节表无 `.symtab`/`.debug_*`，无动态解释器路径） |
+| 前端 | `npm run build` 通过（含 `vue-tsc --noEmit` 类型检查），产物 `44745390cf398c4f.js`（2 093 002 B）已嵌入 `web/html` |
+| amd64 | `s-ui-linux-amd64.tar.gz` 35 760 510 B（内含 `sui` 102 429 512 B），ELF 64 位 x86-64 全静态已 strip（节表无 `.symtab`/`.debug_*`，无动态解释器路径） |
 | 版本 | 包内二进制确认含 `1.6.3-mo4`；`api/updateInfo` → `currentVersion=1.6.3-mo4` |
 
 早前的 `mo1` / `mo2` 在 Debian 12 / 1 核 / 973 MB 内存 VPS 上用 musl-gcc 构建并做过更完整的功能验证，
