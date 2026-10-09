@@ -87,6 +87,17 @@ SUI_AUTO=1 bash <(curl -Ls https://raw.githubusercontent.com/<你的仓库>/main
 - **添加向导**：粘贴落地节点分享链接（`vless:// vmess:// trojan:// ss:// hysteria2:// tuic:// …`），
   SOCKS5 另支持 `IP:端口:用户:密码` 裸写法（前端直接解析）；其余协议走 `api/linkConvert` 转换。
   自动分配不冲突的出站 tag，保存出站与路由规则后立即 `api/checkOutbound` 探测落地连通性。
+- **批量自动建站**（向导顶部开关的「自动建站」模式）：一次粘贴**多行**落地链接，每行一条，
+  逐条生成一整套 —— 入站（vless + reality，端口在 10000-60000 里自动挑一个没被占用的）、
+  用户（自动生成 uuid 并绑到该入站上）、落地出站（从链接解析出来的 socks 节点）、
+  以及一条把它们串起来的 `{inbound:[新入站], auth_user:[新用户], action:'route', outbound:新出站}`。
+  N 行链接就是 N 个入站、N×每节点用户数 个用户、N 个出站和同样数量的规则，
+  不必再回「入站管理」「用户管理」页逐个补。
+  链接自带 `#备注` 时用它命名（`备注-in` / `备注` / `备注-out`），否则用「名称前缀 + 序号」。
+  Reality 配置可以复用已有的一份，也可以让向导现场生成一对密钥（伪装域名默认 `www.apple.com`）。
+  两个刻意的顺序：**全部链接先解析完再动手建**（任何一行解析失败就一条都不建，
+  不留半成品），**规则攒到最后一次性写**（`config` 是唯一会重启核心的 object，
+  所以 N 个节点也只重启一次）。部分失败会列出失败的名字，成功的照常生效。
 - **入口默认全不选**：路由规则会把选中入站的出口整个改道，默认全选会把现有所有节点一次性推到落地 IP 后面
   （「我原来的节点全变成中转的 IP 了」就是这么做出来的），所以必须手动挑。
 - **删除** = 先删路由规则、再删落地出站（顺序不能反，否则规则会短暂指向不存在的出站）；支持全部删除。
@@ -195,15 +206,15 @@ apt-get install -y gcc musl-tools \
 
 ### 4.3 本次构建与验证记录
 
-本次（`1.6.3-mo4`）在 Windows 本机交叉编译，交付物在 Debian 12 VPS 上冒烟：
+本次（`1.6.3-mo5`）在 Windows 本机交叉编译，交付物做了公网回读校验：
 
 | 项目 | 结果 |
 |---|---|
 | 工具链 | Go 1.26.8 + zig 0.14.1（`zig cc -target x86_64-linux-musl`），`CGO_ENABLED=1` |
 | 链接 | `-linkmode external -extldflags '-static -s'`，产出全静态 ELF |
-| 前端 | `npm run build` 通过（含 `vue-tsc --noEmit` 类型检查），产物 `44745390cf398c4f.js`（2 093 002 B）已嵌入 `web/html` |
-| amd64 | `s-ui-linux-amd64.tar.gz` 35 760 510 B（内含 `sui` 102 429 512 B），ELF 64 位 x86-64 全静态已 strip（节表无 `.symtab`/`.debug_*`，无动态解释器路径） |
-| 版本 | 包内二进制确认含 `1.6.3-mo4`；`api/updateInfo` → `currentVersion=1.6.3-mo4` |
+| 前端 | `npm run build` 通过（含 `vue-tsc --noEmit` 类型检查），产物 `18b50f587cb23222.js`（2 101 643 B）已嵌入 `web/html` |
+| amd64 | `s-ui-linux-amd64.tar.gz` 35 762 866 B（内含 `sui` 102 438 152 B），ELF 64 位 x86-64 全静态已 strip（节表无 `.symtab`/`.debug_*`，无动态解释器路径） |
+| 版本 | 包内二进制确认含 `1.6.3-mo5`；本版未在真机跑端到端安装（测试机凭据不可用），公网回读与安装脚本的校验函数实测通过 |
 
 早前的 `mo1` / `mo2` 在 Debian 12 / 1 核 / 973 MB 内存 VPS 上用 musl-gcc 构建并做过更完整的功能验证，
 其中后续版本仍然复用的结论：
@@ -353,7 +364,7 @@ rm -rf web/html && mkdir -p web/html && cp -r frontend/dist/* web/html/
 | `cmd/token.go` / `cmd/cmd.go` | `s-ui token` 子命令 |
 | `util/shadowsocks.go` | SS-2022 32 字节密钥方法 |
 | `config/config.go` | `PanelRepo` / `GetPanelRepo` |
-| `config/version` | `1.6.3-mo4` |
+| `config/version` | `1.6.3-mo5` |
 
 前端：
 
@@ -363,7 +374,7 @@ rm -rf web/html && mkdir -p web/html && cp -r frontend/dist/* web/html/
 | `src/layouts/modals/Client.vue` | 新增 `presetInbounds`：从别处新增用户时预勾入站 |
 | `src/layouts/modals/ExportLinks.vue` | 新增：导出订阅 URL / 分享链接弹窗 |
 | `src/layouts/modals/RelayUsers.vue` | 新增：中转用户管理（列表 / 增删改 / 启用 / 二维码） |
-| `src/layouts/modals/RelayWizard.vue` | 新增：添加中转向导（解析落地链接 → 分配出站 tag → 勾入口入站） |
+| `src/layouts/modals/RelayWizard.vue` | 新增：添加中转向导。两种模式：接入已有入站 / 批量自动建站（每行链接生成入站+用户+出站+规则） |
 | `src/layouts/modals/Server.vue` | 新增：服务器增改弹窗 |
 | `src/locales/{en,zhcn,zhtw}.ts` | 新增文案（三份的覆盖范围见 §8） |
 | `src/plugins/api.ts` | 每个请求注入 `X-Remote-Server` |
