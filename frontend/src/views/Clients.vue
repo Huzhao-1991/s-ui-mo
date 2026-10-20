@@ -90,6 +90,27 @@
       </v-btn>
     </v-col>
     <v-col cols="auto">
+      <v-btn
+        color="primary"
+        variant="tonal"
+        prepend-icon="mdi-export"
+        @click="exportModal = true"
+      >
+        {{ selected.length > 0 ? $t('client.exportSelected', { n: selected.length }) : $t('client.exportAll') }}
+      </v-btn>
+    </v-col>
+    <v-col
+      v-if="selected.length > 0"
+      cols="auto"
+    >
+      <v-btn
+        variant="text"
+        @click="selected = []"
+      >
+        {{ $t('client.clearSelection') }}
+      </v-btn>
+    </v-col>
+    <v-col cols="auto">
       <v-menu
         v-model="actionMenu"
         :close-on-content-click="false"
@@ -421,31 +442,6 @@
       </v-data-table>
     </v-col>
   </v-row>
-  <!-- 勾了人才出现：导出的就是这些用户的 vless 链接 -->
-  <v-row
-    v-if="selected.length > 0"
-    justify="center"
-    align="center"
-  >
-    <v-col cols="auto">
-      <v-btn
-        color="primary"
-        variant="tonal"
-        prepend-icon="mdi-export"
-        @click="exportModal = true"
-      >
-        {{ $t('client.exportSelected', { n: selected.length }) }}
-      </v-btn>
-    </v-col>
-    <v-col cols="auto">
-      <v-btn
-        variant="text"
-        @click="selected = []"
-      >
-        {{ $t('client.clearSelection') }}
-      </v-btn>
-    </v-col>
-  </v-row>
 </template>
 <script lang="ts" setup>
 import Data from '@/store/modules/data'
@@ -612,13 +608,19 @@ const closeSessions = () => {
   sessions.value.visible = false
 }
 
-// 勾选导出：表格的 item-value 是 name，所以这里存的是用户名，
-// 再换回 id 去取完整行（只有完整行才带 links）。
-const selected = ref<string[]>([])
 const exportModal = ref(false)
 
+// 勾选了人就只导这几个，一行没勾就是全部 —— 批量建站之后最常做的
+// 是把整批一次拿走，但也要能挑几个人出来单独给。
+// 表格的 item-value 是 name，所以这里存的是用户名，再换回 id 去取完整行
+// （只有完整行才带 links）。
+const selected = ref<string[]>([])
+
 const exportIds = computed((): number[] => {
-  return clients.value.filter(c => selected.value.includes(c.name)).map(c => c.id)
+  const rows = selected.value.length > 0
+    ? clients.value.filter(c => selected.value.includes(c.name))
+    : clients.value
+  return rows.map(c => c.id).filter((x: number) => x)
 })
 
 const closeExport = () => {
