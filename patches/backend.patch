@@ -149,8 +149,8 @@ diff -ruN
  LABEL org.opencontainers.image.authors="alireza7@gmail.com"
 diff -ruN
 --- a/README-mo.md	1970-01-01 08:00:00.000000000 +0800
-+++ b/README-mo.md	2026-10-10 00:56:36.059594800 +0800
-@@ -0,0 +1,401 @@
++++ b/README-mo.md	2026-10-20 20:48:24.520875300 +0800
+@@ -0,0 +1,429 @@
 +# S-UI 1.6.3 魔改版
 +
 +基于 [alireza0/s-ui](https://github.com/alireza0/s-ui) **v1.6.3**（2026-09-16 发布）的二次开发版本，
@@ -282,6 +282,29 @@ diff -ruN
 +  在中转卡片上重新打开开关即可补一条新的；改名前先把开关关掉最干净。
 +- 附带「导出链接」弹窗：所有客户端的订阅 URL / 全部分享链接（明文或 Base64 整包），直接粘进 v2rayN 批量导入。
 +
++### 2.7 用户管理页勾选批量导出 vless 链接
++
++「用户管理」页（`/clients`）的表格加了勾选框：勾上若干用户，表格下方出现
++「导出选中 N 个用户的 vless 链接」，点开就是一个明文文本框，一行一条，
++整块复制即可粘进客户端的「从剪贴板导入批量URL」。
++
++批量自动建站（2.6）一次能建出 N 个节点，建完之后最常做的事就是把这批链接
++整个拿走分发。以前只能逐个点二维码，或者去中转页的「导出链接」里拿**全部**
++客户端的**全部**协议再自己挑。现在按人筛、按协议筛，一次到位。
++
++两条筛选都不靠猜：
++
++1. **`type === 'local'`**：后端 `updateLinksWithFixedInbounds` 给「本机入站生成的链接」
++   打的标记（同一处写入的 `remark` 是入站 tag）。用户自己添加的外部链接、订阅都不是
++   local —— 导出它们等于把别人的凭据发出去。
++2. **`uri` 以 `vless://` 开头**：自动建站生成的入口入站本来就是 vless + reality，
++   而 reality 体现在 URI 的 `security=reality` 参数上、不在协议名里，所以按前缀筛
++   vless，而不是去找并不存在的 `reality://`。落地的 socks 链接本来就不是 vless，
++   顺带被排除。
++
++弹窗只给明文多行，不做 Base64 整包、也不摆二维码：这一步的用途就是「复制走」，
++多一种格式就多一次点错的机会。
++
 +## 3. 相对原魔改版实现上的改进
 +
 +
@@ -345,12 +368,17 @@ diff -ruN
 +装不会带上；缺了之后交叉 gcc 会**静默回退到宿主的 `/usr/include`**，报一串
 +`bits/wordsize.h: No such file or directory` —— 看起来像编译器坏了，实际上只是少了两行包。
 +
-+### 4.2 为什么必须在 Linux 上编
++### 4.2 为什么一般要在 Linux 上编
 +
 +`with_purego`（运行时 dlopen cronet 而不是链接期）确实省掉了上游 CI 里那套 Chromium/cronet 工具链，
 +但**它省的是 cronet，不是 cgo**。SQLite 这一条路仍然要真实的目标平台 C 编译器和目标 libc 头文件，
-+所以 Windows / macOS 上无法直接出可用的 Linux 包（本机试过 `zig cc` 充当交叉 C 编译器，
-+被安全软件在进程级拦掉了，不可行）。
++所以 Windows / macOS 上想出可用的 Linux 包，得先解决交叉 C 编译器这一关。
++
++本机（Windows）的做法是用 **`zig cc -target x86_64-linux-musl`** 充当交叉 C 编译器，
++mo3 起的交付都是这么编出来的（见 4.3）。这条路一开始并没走通：zig 的进程被本机的
++安全软件在进程级拦掉过，把它加进白名单之后才可用。**所以「不可行」的从来不是
++zig 方案本身，而是那台机器上的安全策略** —— 换到别的 Windows 机器上大概率还要
++再处理一次。也正因如此，交付只出 `linux/amd64` 一份，脚本本身仍以 Linux 为主场。
 +
 +上游官方 CI 走的是 Bootlin musl sysroot，产出的是各类 arch 的**全静态 musl** 二进制；
 +`build-release.sh` 在 amd64 上用 `musl-gcc` 得到同等效果，ARM 目标则用 Debian 交叉 gcc + `-static`
@@ -359,15 +387,15 @@ diff -ruN
 +
 +### 4.3 本次构建与验证记录
 +
-+本次（`1.6.3-mo5`）在 Windows 本机交叉编译，交付物做了公网回读校验：
++本次（`1.6.3-mo6`）在 Windows 本机交叉编译，交付物做了公网回读校验：
 +
 +| 项目 | 结果 |
 +|---|---|
 +| 工具链 | Go 1.26.8 + zig 0.14.1（`zig cc -target x86_64-linux-musl`），`CGO_ENABLED=1` |
 +| 链接 | `-linkmode external -extldflags '-static -s'`，产出全静态 ELF |
-+| 前端 | `npm run build` 通过（含 `vue-tsc --noEmit` 类型检查），产物 `18b50f587cb23222.js`（2 101 643 B）已嵌入 `web/html` |
-+| amd64 | `s-ui-linux-amd64.tar.gz` 35 762 866 B（内含 `sui` 102 438 152 B），ELF 64 位 x86-64 全静态已 strip（节表无 `.symtab`/`.debug_*`，无动态解释器路径） |
-+| 版本 | 包内二进制确认含 `1.6.3-mo5`；本版未在真机跑端到端安装（测试机凭据不可用），公网回读与安装脚本的校验函数实测通过 |
++| 前端 | `npm run build` 通过（含 `vue-tsc --noEmit` 类型检查），产物 `b01ffd7c68fe783d.js`（2 105 747 B）已嵌入 `web/html` |
++| amd64 | `s-ui-linux-amd64.tar.gz` 35 766 912 B（内含 `sui` 102 442 248 B），ELF 64 位 x86-64 全静态已 strip（节表无 `.symtab`/`.debug_*`，无动态解释器路径） |
++| 版本 | 包内二进制确认含 `1.6.3-mo6`；本版未在真机跑端到端安装（测试机凭据不可用），公网回读与安装脚本的校验函数实测通过 |
 +
 +早前的 `mo1` / `mo2` 在 Debian 12 / 1 核 / 973 MB 内存 VPS 上用 musl-gcc 构建并做过更完整的功能验证，
 +其中后续版本仍然复用的结论：
@@ -517,7 +545,7 @@ diff -ruN
 +| `cmd/token.go` / `cmd/cmd.go` | `s-ui token` 子命令 |
 +| `util/shadowsocks.go` | SS-2022 32 字节密钥方法 |
 +| `config/config.go` | `PanelRepo` / `GetPanelRepo` |
-+| `config/version` | `1.6.3-mo5` |
++| `config/version` | `1.6.3-mo6` |
 +
 +前端：
 +
@@ -1253,11 +1281,12 @@ diff -ruN
  }
 diff -ruN
 --- a/config/version	2026-09-16 08:54:30.000000000 +0800
-+++ b/config/version	2026-10-10 00:54:59.928094300 +0800
++++ b/config/version	2026-10-20 20:45:12.183708700 +0800
 @@ -1 +1 @@
 -1.6.3
 \ No newline at end of file
-+1.6.3-mo5
++1.6.3-mo6
+\ No newline at end of file
 diff -ruN
 --- a/database/model/server.go	1970-01-01 08:00:00.000000000 +0800
 +++ b/database/model/server.go	2026-10-04 11:00:15.114743600 +0800

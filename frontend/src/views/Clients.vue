@@ -42,6 +42,12 @@
     :tag="sessions.tag"
     @close="closeSessions"
   />
+  <ClientLinks
+    v-model="exportModal"
+    :visible="exportModal"
+    :client-ids="exportIds"
+    @close="closeExport"
+  />
   <v-dialog
     v-model="resetTrafficModal"
     width="auto"
@@ -216,6 +222,8 @@
   <v-row>
     <v-col cols="12">
       <v-data-table
+        v-model="selected"
+        show-select
         :headers="headers"
         :items="filterSettings.enabled ? filterSettings.filteredClients : clients"
         :hide-default-footer="filterSettings.enabled ? filterSettings.filteredClients.length<=10 : clients.length<=10"
@@ -413,6 +421,31 @@
       </v-data-table>
     </v-col>
   </v-row>
+  <!-- 勾了人才出现：导出的就是这些用户的 vless 链接 -->
+  <v-row
+    v-if="selected.length > 0"
+    justify="center"
+    align="center"
+  >
+    <v-col cols="auto">
+      <v-btn
+        color="primary"
+        variant="tonal"
+        prepend-icon="mdi-export"
+        @click="exportModal = true"
+      >
+        {{ $t('client.exportSelected', { n: selected.length }) }}
+      </v-btn>
+    </v-col>
+    <v-col cols="auto">
+      <v-btn
+        variant="text"
+        @click="selected = []"
+      >
+        {{ $t('client.clearSelection') }}
+      </v-btn>
+    </v-col>
+  </v-row>
 </template>
 <script lang="ts" setup>
 import Data from '@/store/modules/data'
@@ -422,6 +455,7 @@ import ClientEditBulk from '@/layouts/modals/ClientEditBulk.vue'
 import QrCode from '@/layouts/modals/QrCode.vue'
 import Stats from '@/layouts/modals/Stats.vue'
 import Sessions from '@/layouts/modals/Sessions.vue'
+import ClientLinks from '@/layouts/modals/ClientLinks.vue'
 import { Client } from '@/types/clients'
 import { Inbound } from '@/types/inbounds'
 import { computed, ref } from 'vue'
@@ -576,6 +610,19 @@ const showSessions = (tag: string) => {
 }
 const closeSessions = () => {
   sessions.value.visible = false
+}
+
+// 勾选导出：表格的 item-value 是 name，所以这里存的是用户名，
+// 再换回 id 去取完整行（只有完整行才带 links）。
+const selected = ref<string[]>([])
+const exportModal = ref(false)
+
+const exportIds = computed((): number[] => {
+  return clients.value.filter(c => selected.value.includes(c.name)).map(c => c.id)
+})
+
+const closeExport = () => {
+  exportModal.value = false
 }
 
 const doFilter = () => {

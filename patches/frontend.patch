@@ -73,6 +73,164 @@ diff -ruN
          this.clientConfig = randomConfigs('client')
        }
 diff -ruN
+--- a/src/layouts/modals/ClientLinks.vue	1970-01-01 08:00:00.000000000 +0800
++++ b/src/layouts/modals/ClientLinks.vue	2026-10-20 20:44:08.369899500 +0800
+@@ -0,0 +1,154 @@
++<template>
++  <!-- ======================================================================
++    导出选中用户的 vless 链接（ClientLinks）
++    --------------------------------------------------------------------
++    用户管理页勾选若干用户 -> 一次请求取回这些用户的完整行（带 links） ->
++    只留本机入站生成的 vless 链接，一行一条，整块复制即可粘进客户端的
++    "从剪贴板导入批量URL"。
++
++    两条筛选，都不靠猜：
++      - type === 'local'：后端 updateLinksWithFixedInbounds 给本机入站生成的
++        链接打的标记（remark 存的是入站 tag）。用户自己添加的外部链接、订阅
++        都不是 local，导出它们等于把别人的凭据发出去。
++      - uri 以 vless:// 开头：批量建站生成的入口入站本来就是 vless + reality，
++        reality 体现在 URI 的 security=reality 参数上，不在协议名里，所以按
++        前缀筛 vless 而不是找 "reality://"。socks 那类落地链接自然被排除。
++    ====================================================================== -->
++  <v-dialog transition="dialog-bottom-transition" width="760">
++    <v-card
++      class="rounded-lg"
++      id="client-links-modal"
++      :loading="loading"
++    >
++      <v-card-title>
++        <v-row>
++          <v-col>{{ $t('client.exportTitle') }}</v-col>
++          <v-spacer />
++          <v-col cols="auto">
++            <v-icon
++              icon="mdi-close-box"
++              @click="$emit('close')"
++            />
++          </v-col>
++        </v-row>
++      </v-card-title>
++      <v-divider />
++      <v-card-text>
++        <p style="font-size: 0.85rem; opacity: 0.8; margin-bottom: 12px;">
++          {{ $t('client.exportHint') }}
++        </p>
++        <v-textarea
++          :model-value="text"
++          :rows="12"
++          readonly
++          variant="outlined"
++          hide-details
++          :placeholder="$t('client.exportEmpty')"
++          style="font-family: monospace; font-size: 0.78rem;"
++        />
++        <div style="text-align: end; margin-top: 10px;">
++          <span style="font-size: 0.8rem; opacity: 0.7; margin-inline-end: 10px;">
++            {{ $t('client.linksCount', { n: count }) }}
++          </span>
++          <v-btn
++            color="primary"
++            variant="tonal"
++            :disabled="!text"
++            @click="copy(text)"
++          >
++            {{ $t('exportLinks.copy') }}
++          </v-btn>
++        </div>
++      </v-card-text>
++      <v-card-actions>
++        <v-spacer />
++        <v-btn
++          color="primary"
++          variant="outlined"
++          @click="$emit('close')"
++        >
++          {{ $t('actions.close') }}
++        </v-btn>
++      </v-card-actions>
++    </v-card>
++  </v-dialog>
++</template>
++
++<script lang="ts">
++import HttpUtils from '@/plugins/httputil'
++import Clipboard from 'clipboard'
++import { i18n } from '@/locales'
++import { push } from 'notivue'
++
++export default {
++  props: ['visible', 'clientIds'],
++  emits: ['close'],
++  data() {
++    return {
++      loading: false,
++      text: '',   // 明文链接，一行一条
++      count: 0,   // 条数
++    }
++  },
++  watch: {
++    // 每次打开都重新拉，导出的一定是当前状态
++    visible(v: boolean) {
++      if (v) this.load()
++    },
++  },
++  methods: {
++    async load() {
++      this.loading = true
++      this.text = ''
++      this.count = 0
++
++      const ids = (this.clientIds ?? []).filter((x: number) => x)
++      if (ids.length > 0) {
++        const msg = await HttpUtils.get<{ clients?: any[] }>('api/clients', { id: ids.join(',') })
++        if (msg.success && msg.obj?.clients) {
++          const uris: string[] = []
++          msg.obj.clients.forEach((c: any) => {
++            (c.links ?? []).forEach((l: any) => {
++              if (l.type === 'local' && (l.uri ?? '').startsWith('vless://')) uris.push(l.uri)
++            })
++          })
++          this.text = uris.join('\n')
++          this.count = uris.length
++        }
++      }
++      this.loading = false
++    },
++    // 复制到剪贴板。clipboard 库要求从真实 DOM 元素触发，
++    // 所以临时建一个隐藏按钮，点击后立刻销毁。
++    copy(txt: string) {
++      if (!txt) return
++      const hiddenButton = document.createElement('button')
++      hiddenButton.className = 'client-links-clipboard-btn'
++      document.body.appendChild(hiddenButton)
++
++      const clipboard = new Clipboard('.client-links-clipboard-btn', {
++        text: () => txt,
++        container: document.getElementById('client-links-modal') ?? undefined,
++      })
++
++      clipboard.on('success', () => {
++        clipboard.destroy()
++        push.success({
++          message: i18n.global.t('success') + ': ' + i18n.global.t('copyToClipboard'),
++          duration: 3000,
++        })
++      })
++      clipboard.on('error', () => {
++        clipboard.destroy()
++        push.error({
++          message: i18n.global.t('failed') + ': ' + i18n.global.t('copyToClipboard'),
++          duration: 3000,
++        })
++      })
++
++      hiddenButton.click()
++      document.body.removeChild(hiddenButton)
++    },
++  },
++}
++</script>
+diff -ruN
 --- a/src/layouts/modals/ExportLinks.vue	1970-01-01 08:00:00.000000000 +0800
 +++ b/src/layouts/modals/ExportLinks.vue	2026-10-04 15:03:11.897354200 +0800
 @@ -0,0 +1,197 @@
@@ -275,7 +433,7 @@ diff -ruN
 +</script>
 diff -ruN
 --- a/src/layouts/modals/RelayUsers.vue	1970-01-01 08:00:00.000000000 +0800
-+++ b/src/layouts/modals/RelayUsers.vue	2026-10-05 19:29:26.484625600 +0800
++++ b/src/layouts/modals/RelayUsers.vue	2026-10-20 19:31:56.624913100 +0800
 @@ -0,0 +1,494 @@
 +<template>
 +  <!-- ======================================================================
@@ -1554,7 +1712,7 @@ diff -ruN
 +</script>
 diff -ruN
 --- a/src/locales/en.ts	2026-09-16 08:54:08.000000000 +0800
-+++ b/src/locales/en.ts	2026-10-10 00:53:05.920454800 +0800
++++ b/src/locales/en.ts	2026-10-20 20:44:49.965845600 +0800
 @@ -42,8 +42,10 @@
      login: "Login",
      home: "Home",
@@ -1683,9 +1841,22 @@ diff -ruN
    },
    login: {
      title: "Login",
+@@ -234,6 +332,12 @@
+     autoReset: "Auto Reset",
+     resetDays: "Reset Days",
+     nextReset: "Next Reset",
++    exportTitle: "vless node links",
++    exportHint: "Only vless links generated by this panel's own inbounds (reality included). External links and subscriptions are left out.",
++    exportSelected: "Export vless links of {n} selected user(s)",
++    clearSelection: "Clear selection",
++    linksCount: "{n} link(s)",
++    exportEmpty: "No vless link to export",
+   },
+   bulk: {
+     order: "Order",
 diff -ruN
 --- a/src/locales/zhcn.ts	2026-09-16 08:54:08.000000000 +0800
-+++ b/src/locales/zhcn.ts	2026-10-10 00:53:21.485152200 +0800
++++ b/src/locales/zhcn.ts	2026-10-20 20:44:55.471085500 +0800
 @@ -42,8 +42,10 @@
      login: "登录",
      home: "主页",
@@ -1814,6 +1985,19 @@ diff -ruN
    },
    login: {
      title: "登录",
+@@ -234,6 +332,12 @@
+     autoReset: "自动重置",
+     resetDays: "重置天数",
+     nextReset: "下次重置",
++    exportTitle: "vless 节点链接",
++    exportHint: "只导出本面板入站生成的 vless 链接（含 reality）；外部链接与订阅不会出现。",
++    exportSelected: "导出选中 {n} 个用户的 vless 链接",
++    clearSelection: "取消选择",
++    linksCount: "共 {n} 条",
++    exportEmpty: "没有可导出的 vless 链接",
+   },
+   bulk: {
+     order: "排序",
 diff -ruN
 --- a/src/locales/zhtw.ts	2026-09-16 08:54:08.000000000 +0800
 +++ b/src/locales/zhtw.ts	2026-10-04 13:07:16.094559700 +0800
@@ -2036,6 +2220,91 @@ diff -ruN
 +  token?: string
 +  remark?: string
 +}
+diff -ruN
+--- a/src/views/Clients.vue	2026-09-16 08:54:08.000000000 +0800
++++ b/src/views/Clients.vue	2026-10-20 20:44:44.176489800 +0800
+@@ -42,6 +42,12 @@
+     :tag="sessions.tag"
+     @close="closeSessions"
+   />
++  <ClientLinks
++    v-model="exportModal"
++    :visible="exportModal"
++    :client-ids="exportIds"
++    @close="closeExport"
++  />
+   <v-dialog
+     v-model="resetTrafficModal"
+     width="auto"
+@@ -216,6 +222,8 @@
+   <v-row>
+     <v-col cols="12">
+       <v-data-table
++        v-model="selected"
++        show-select
+         :headers="headers"
+         :items="filterSettings.enabled ? filterSettings.filteredClients : clients"
+         :hide-default-footer="filterSettings.enabled ? filterSettings.filteredClients.length<=10 : clients.length<=10"
+@@ -413,6 +421,31 @@
+       </v-data-table>
+     </v-col>
+   </v-row>
++  <!-- 勾了人才出现：导出的就是这些用户的 vless 链接 -->
++  <v-row
++    v-if="selected.length > 0"
++    justify="center"
++    align="center"
++  >
++    <v-col cols="auto">
++      <v-btn
++        color="primary"
++        variant="tonal"
++        prepend-icon="mdi-export"
++        @click="exportModal = true"
++      >
++        {{ $t('client.exportSelected', { n: selected.length }) }}
++      </v-btn>
++    </v-col>
++    <v-col cols="auto">
++      <v-btn
++        variant="text"
++        @click="selected = []"
++      >
++        {{ $t('client.clearSelection') }}
++      </v-btn>
++    </v-col>
++  </v-row>
+ </template>
+ <script lang="ts" setup>
+ import Data from '@/store/modules/data'
+@@ -422,6 +455,7 @@
+ import QrCode from '@/layouts/modals/QrCode.vue'
+ import Stats from '@/layouts/modals/Stats.vue'
+ import Sessions from '@/layouts/modals/Sessions.vue'
++import ClientLinks from '@/layouts/modals/ClientLinks.vue'
+ import { Client } from '@/types/clients'
+ import { Inbound } from '@/types/inbounds'
+ import { computed, ref } from 'vue'
+@@ -578,6 +612,19 @@
+   sessions.value.visible = false
+ }
+ 
++// 勾选导出：表格的 item-value 是 name，所以这里存的是用户名，
++// 再换回 id 去取完整行（只有完整行才带 links）。
++const selected = ref<string[]>([])
++const exportModal = ref(false)
++
++const exportIds = computed((): number[] => {
++  return clients.value.filter(c => selected.value.includes(c.name)).map(c => c.id)
++})
++
++const closeExport = () => {
++  exportModal.value = false
++}
++
+ const doFilter = () => {
+   let filteredClients = clients.value.slice()
+   if (filterSettings.value.group != '-') {
 diff -ruN
 --- a/src/views/Relay.vue	1970-01-01 08:00:00.000000000 +0800
 +++ b/src/views/Relay.vue	2026-10-05 19:29:26.471663900 +0800

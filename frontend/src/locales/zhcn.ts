@@ -332,6 +332,12 @@ export default {
     autoReset: "自动重置",
     resetDays: "重置天数",
     nextReset: "下次重置",
+    exportTitle: "vless 节点链接",
+    exportHint: "只导出本面板入站生成的 vless 链接（含 reality）；外部链接与订阅不会出现。",
+    exportSelected: "导出选中 {n} 个用户的 vless 链接",
+    clearSelection: "取消选择",
+    linksCount: "共 {n} 条",
+    exportEmpty: "没有可导出的 vless 链接",
   },
   bulk: {
     order: "排序",
