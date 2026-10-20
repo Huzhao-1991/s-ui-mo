@@ -49,6 +49,25 @@
                   </v-col>
                   <v-spacer />
                   <v-col cols="auto">
+                    <v-btn
+                      size="small"
+                      variant="text"
+                      color="primary"
+                      @click="reloadItems = [...allTiles]"
+                    >
+                      {{ $t('main.tilesAll') }}
+                    </v-btn>
+                  </v-col>
+                  <v-col cols="auto">
+                    <v-btn
+                      size="small"
+                      variant="text"
+                      @click="reloadItems = []"
+                    >
+                      {{ $t('main.tilesNone') }}
+                    </v-btn>
+                  </v-col>
+                  <v-col cols="auto">
                     <v-icon
                       icon="mdi-close"
                       @click="menu = false"
@@ -430,7 +449,7 @@
 <script lang="ts" setup>
 import HttpUtils from '@/plugins/httputil'
 import { HumanReadable } from '@/plugins/utils'
-import Data from '@/store/modules/data'
+import Data, { allTiles } from '@/store/modules/data'
 import Gauge from '@/components/tiles/Gauge.vue'
 import History from '@/components/tiles/History.vue'
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
@@ -523,17 +542,41 @@ const reloadItems = computed({
     if (Data().reloadItems.length == 0 && v.length>0) startTimer()
     if (Data().reloadItems.length > 0 && v.length == 0) stopTimer()
     Data().reloadItems = v
-    if (v.length > 0) localStorage.setItem("reloadItems", v.join(','))
-    else localStorage.removeItem("reloadItems")
+    // "" rather than removeItem: the key being absent is what means "never
+    // configured, show everything", and wiping it would resurrect every tile
+    // the operator just switched off.
+    localStorage.setItem("reloadItems", v.join(','))
   }
 })
 
+// Tile id -> the section name api/status answers for. Several tiles share a
+// section (h-net and hp-net both want `net`), and the id's middle segment is
+// not always that name — hp-net would ask for `p`, which the backend ignores.
+const sectionOf = (tile: string): string => {
+  switch (tile) {
+    case 'g-cpu': case 'h-cpu': return 'cpu'
+    case 'g-mem': case 'h-mem': return 'mem'
+    case 'g-dsk': return 'dsk'
+    case 'g-swp': return 'swp'
+    case 'h-net': case 'hp-net': return 'net'
+    case 'h-dio': return 'dio'
+    case 'i-sys': return 'sys'
+    case 'i-sbd': return 'sbd'
+  }
+  return tile
+}
+
 const reloadData = async () => {
-  const request = [...new Set(reloadItems.value.map(r => r.split('-')[1]))]
-  if (tilesData.value?.sys?.appVersion) request.filter(r => r != 'sys')
+  const wanted = [...new Set(reloadItems.value.map(sectionOf))]
+  // System info does not change while the panel is up; asking once is enough.
+  const request = tilesData.value?.sys?.appVersion ? wanted.filter(r => r != 'sys') : wanted
+  if (request.length == 0) return
   const data = await HttpUtils.get<TilesData>('api/status',{ r: request.join(',')})
   if (data.success) {
-    tilesData.value = data.obj
+    // Merge, not replace: the response only carries the sections just asked
+    // for, so assigning it whole would drop everything fetched on earlier
+    // polls (sys in particular, which is only requested once).
+    tilesData.value = { ...tilesData.value, ...data.obj }
   }
 }
 

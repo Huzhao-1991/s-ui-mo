@@ -129,6 +129,8 @@ export default {
   },
   main: {
     tiles: "Tiles",
+    tilesAll: "All",
+    tilesNone: "None",
     gauges: "Gauges",
     charts: "Charts",
     infos: "Information",

@@ -49,10 +49,26 @@ export interface LoadedData {
 // one it was handed.
 type Tagged = Inbound | Outbound | Srv | Endpoint
 
+// Every tile the home page can show. The panel opens with all of them on: the
+// list used to start empty, so a fresh install showed a logo and nothing else
+// until the operator found the Tiles menu and switched things on by hand.
+// Must stay in sync with `menuItems` in components/Main.vue.
+export const allTiles = [
+  "g-cpu", "g-mem", "g-dsk", "g-swp",
+  "h-cpu", "h-mem", "h-net", "hp-net", "h-dio",
+  "i-sys", "i-sbd",
+]
+
+// `reloadItems` is the persisted selection. Two "nothing" cases have to stay
+// apart: never touched (show everything) vs. deliberately switched off (show
+// nothing). That is why a cleared selection is stored as an empty string
+// instead of removing the key.
+const storedTiles = localStorage.getItem("reloadItems")
+
 const Data = defineStore('Data', {
   state: () => ({ 
     lastLoad: 0,
-    reloadItems: localStorage.getItem("reloadItems")?.split(',')?? <string[]>[],
+    reloadItems: storedTiles === null ? [...allTiles] : (storedTiles == "" ? <string[]>[] : storedTiles.split(',')),
     subURI: "",
     os: "",
     enableTraffic: false,

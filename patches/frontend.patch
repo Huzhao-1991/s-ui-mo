@@ -1,4 +1,89 @@
 diff -ruN
+--- a/src/components/Main.vue	2026-09-16 08:54:08.000000000 +0800
++++ b/src/components/Main.vue	2026-10-20 23:30:03.413400400 +0800
+@@ -49,6 +49,25 @@
+                   </v-col>
+                   <v-spacer />
+                   <v-col cols="auto">
++                    <v-btn
++                      size="small"
++                      variant="text"
++                      color="primary"
++                      @click="reloadItems = [...allTiles]"
++                    >
++                      {{ $t('main.tilesAll') }}
++                    </v-btn>
++                  </v-col>
++                  <v-col cols="auto">
++                    <v-btn
++                      size="small"
++                      variant="text"
++                      @click="reloadItems = []"
++                    >
++                      {{ $t('main.tilesNone') }}
++                    </v-btn>
++                  </v-col>
++                  <v-col cols="auto">
+                     <v-icon
+                       icon="mdi-close"
+                       @click="menu = false"
+@@ -430,7 +449,7 @@
+ <script lang="ts" setup>
+ import HttpUtils from '@/plugins/httputil'
+ import { HumanReadable } from '@/plugins/utils'
+-import Data from '@/store/modules/data'
++import Data, { allTiles } from '@/store/modules/data'
+ import Gauge from '@/components/tiles/Gauge.vue'
+ import History from '@/components/tiles/History.vue'
+ import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+@@ -523,17 +542,41 @@
+     if (Data().reloadItems.length == 0 && v.length>0) startTimer()
+     if (Data().reloadItems.length > 0 && v.length == 0) stopTimer()
+     Data().reloadItems = v
+-    if (v.length > 0) localStorage.setItem("reloadItems", v.join(','))
+-    else localStorage.removeItem("reloadItems")
++    // "" rather than removeItem: the key being absent is what means "never
++    // configured, show everything", and wiping it would resurrect every tile
++    // the operator just switched off.
++    localStorage.setItem("reloadItems", v.join(','))
+   }
+ })
+ 
++// Tile id -> the section name api/status answers for. Several tiles share a
++// section (h-net and hp-net both want `net`), and the id's middle segment is
++// not always that name — hp-net would ask for `p`, which the backend ignores.
++const sectionOf = (tile: string): string => {
++  switch (tile) {
++    case 'g-cpu': case 'h-cpu': return 'cpu'
++    case 'g-mem': case 'h-mem': return 'mem'
++    case 'g-dsk': return 'dsk'
++    case 'g-swp': return 'swp'
++    case 'h-net': case 'hp-net': return 'net'
++    case 'h-dio': return 'dio'
++    case 'i-sys': return 'sys'
++    case 'i-sbd': return 'sbd'
++  }
++  return tile
++}
++
+ const reloadData = async () => {
+-  const request = [...new Set(reloadItems.value.map(r => r.split('-')[1]))]
+-  if (tilesData.value?.sys?.appVersion) request.filter(r => r != 'sys')
++  const wanted = [...new Set(reloadItems.value.map(sectionOf))]
++  // System info does not change while the panel is up; asking once is enough.
++  const request = tilesData.value?.sys?.appVersion ? wanted.filter(r => r != 'sys') : wanted
++  if (request.length == 0) return
+   const data = await HttpUtils.get<TilesData>('api/status',{ r: request.join(',')})
+   if (data.success) {
+-    tilesData.value = data.obj
++    // Merge, not replace: the response only carries the sections just asked
++    // for, so assigning it whole would drop everything fetched on earlier
++    // polls (sys in particular, which is only requested once).
++    tilesData.value = { ...tilesData.value, ...data.obj }
+   }
+ }
+ 
+diff -ruN
 --- a/src/layouts/default/Drawer.vue	2026-09-16 08:54:08.000000000 +0800
 +++ b/src/layouts/default/Drawer.vue	2026-10-04 15:01:42.432336400 +0800
 @@ -11,6 +11,8 @@
@@ -2235,8 +2320,8 @@ diff -ruN
 +</script>
 diff -ruN
 --- a/src/locales/en.ts	2026-09-16 08:54:08.000000000 +0800
-+++ b/src/locales/en.ts	2026-10-20 23:05:03.689942300 +0800
-@@ -1,810 +1,929 @@
++++ b/src/locales/en.ts	2026-10-20 23:29:02.842429700 +0800
+@@ -1,810 +1,931 @@
 -export default {
 -  success: "success",
 -  failed: "failed",
@@ -3178,6 +3263,8 @@ diff -ruN
 +  },
 +  main: {
 +    tiles: "Tiles",
++    tilesAll: "All",
++    tilesNone: "None",
 +    gauges: "Gauges",
 +    charts: "Charts",
 +    infos: "Information",
@@ -3978,8 +4065,8 @@ diff -ruN
 +}
 diff -ruN
 --- a/src/locales/zhcn.ts	2026-09-16 08:54:08.000000000 +0800
-+++ b/src/locales/zhcn.ts	2026-10-20 23:05:16.190644800 +0800
-@@ -1,808 +1,927 @@
++++ b/src/locales/zhcn.ts	2026-10-20 23:29:02.833454000 +0800
+@@ -1,808 +1,929 @@
 -export default {
 -  success: "成功",
 -  failed: "失败",
@@ -4919,6 +5006,8 @@ diff -ruN
 +  },
 +  main: {
 +    tiles: "信息卡",
++    tilesAll: "全部",
++    tilesNone: "清空",
 +    gauges: "仪表板",
 +    charts: "图表",
 +    infos: "信息",
@@ -5864,7 +5953,7 @@ diff -ruN
    }, 10000)
 diff -ruN
 --- a/src/store/modules/data.ts	2026-09-16 08:54:08.000000000 +0800
-+++ b/src/store/modules/data.ts	2026-10-04 11:06:59.776199300 +0800
++++ b/src/store/modules/data.ts	2026-10-20 23:28:24.011100200 +0800
 @@ -9,6 +9,8 @@
  import { Endpoint } from '@/types/endpoints'
  import { Config } from '@/types/config'
@@ -5874,7 +5963,7 @@ diff -ruN
  
  // Online tags, by kind. The backend marks each list `omitempty`, so a poll
  // with nobody online answers with {} rather than three empty lists. Every
-@@ -37,6 +39,10 @@
+@@ -37,16 +39,36 @@
    services?: Srv[]
    endpoints?: Endpoint[]
    tls?: tls[]
@@ -5885,7 +5974,34 @@ diff -ruN
  }
  
  // The duplicate-tag check works on any of the four lists without caring which
-@@ -61,6 +67,10 @@
+ // one it was handed.
+ type Tagged = Inbound | Outbound | Srv | Endpoint
+ 
++// Every tile the home page can show. The panel opens with all of them on: the
++// list used to start empty, so a fresh install showed a logo and nothing else
++// until the operator found the Tiles menu and switched things on by hand.
++// Must stay in sync with `menuItems` in components/Main.vue.
++export const allTiles = [
++  "g-cpu", "g-mem", "g-dsk", "g-swp",
++  "h-cpu", "h-mem", "h-net", "hp-net", "h-dio",
++  "i-sys", "i-sbd",
++]
++
++// `reloadItems` is the persisted selection. Two "nothing" cases have to stay
++// apart: never touched (show everything) vs. deliberately switched off (show
++// nothing). That is why a cleared selection is stored as an empty string
++// instead of removing the key.
++const storedTiles = localStorage.getItem("reloadItems")
++
+ const Data = defineStore('Data', {
+   state: () => ({ 
+     lastLoad: 0,
+-    reloadItems: localStorage.getItem("reloadItems")?.split(',')?? <string[]>[],
++    reloadItems: storedTiles === null ? [...allTiles] : (storedTiles == "" ? <string[]>[] : storedTiles.split(',')),
+     subURI: "",
+     os: "",
+     enableTraffic: false,
+@@ -61,6 +83,10 @@
      endpoints: <Endpoint[]>[],
      clients: <Client[]>[],
      tlsConfigs: <tls[]>[],
@@ -5896,7 +6012,7 @@ diff -ruN
    }),
    actions: {
      async loadData() {
-@@ -96,6 +106,26 @@
+@@ -96,6 +122,26 @@
        if (Object.hasOwn(data, 'services')) this.services = data.services ?? []
        if (Object.hasOwn(data, 'endpoints')) this.endpoints = data.endpoints ?? []
        if (Object.hasOwn(data, 'tls')) this.tlsConfigs = data.tls ?? []

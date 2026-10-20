@@ -197,6 +197,31 @@ SUI_AUTO=1 bash <(curl -Ls https://raw.githubusercontent.com/<你的仓库>/main
 后端保存 clients 时会把凭据写回绑定的入站（`UpdateInboundsUsers`），所以这张表
 既是「谁能从这个入站连进来」，也是 sing-box 配置里 `users` 的真相。
 
+### 2.9 主页信息卡默认全部开启
+
+主页（`Home.vue` → `components/Main.vue`）原来一进来只有 logo：信息卡要自己点
+工具栏的「信息卡」按钮，在里面一个个开。现在改成**默认 11 张全开**（4 个仪表 +
+5 个图表 + 2 个信息块），不需要任何操作。
+
+选择仍然记在 `localStorage` 的 `reloadItems` 里，关掉的卡片下次进来还是关着的。
+这里把两种「空」分开了：
+
+- **键不存在** = 从没设置过 → 全部开启
+- **键是空字符串** = 用户主动全关了 → 尊重，一张都不开
+
+所以清空选择写的是 `setItem("reloadItems", "")` 而不是 `removeItem` —— 后者会
+让下次刷新把刚关掉的卡片全部复活。弹窗标题栏另加了「全部 / 清空」两个按钮，
+一键切换，不用逐张点。
+
+顺带修掉两个上游留下的取值问题：
+
+1. **请求段名映射错了**。原来用 `tile.split('-')[1]` 推断 `api/status` 的 `r` 参数，
+   `hp-net`（网络数据包）切出来的是 `p`，后端根本不认，这张卡开了也一直是空的。
+   改成显式的 `sectionOf()` 映射（`h-net` 和 `hp-net` 都映射到 `net`）。
+2. **轮询结果整体覆盖会丢数据**。`tilesData.value = data.obj` 是整体替换，而响应里
+   只有本次请求的那些段；`sys` 只请求一次，于是下一轮就把 `sys` 抹掉，再下一轮
+   发现没有又去请求，来回抖。改成合并 `{ ...tilesData.value, ...data.obj }`。
+
 ## 3. 相对原魔改版实现上的改进
 
 
@@ -279,15 +304,15 @@ zig 方案本身，而是那台机器上的安全策略** —— 换到别的 Wi
 
 ### 4.3 本次构建与验证记录
 
-本次（`1.6.3-mo8`）在 Windows 本机交叉编译，交付物做了公网回读校验：
+本次（`1.6.3-mo9`）在 Windows 本机交叉编译，交付物做了公网回读校验：
 
 | 项目 | 结果 |
 |---|---|
 | 工具链 | Go 1.26.8 + zig 0.14.1（`zig cc -target x86_64-linux-musl`），`CGO_ENABLED=1` |
 | 链接 | `-linkmode external -extldflags '-static -s'`，产出全静态 ELF |
-| 前端 | `npm run build` 通过（含 `vue-tsc --noEmit` 类型检查），产物 `c00374ebee45daf2.js`（2 119 903 B）已嵌入 `web/html` |
-| amd64 | `s-ui-linux-amd64.tar.gz` 35 771 554 B（内含 `sui` 102 456 392 B），ELF 64 位 x86-64 全静态已 strip（节表无 `.symtab`/`.debug_*`，无动态解释器路径） |
-| 版本 | 包内二进制确认含 `1.6.3-mo8`；本版未在真机跑端到端安装（测试机凭据不可用），公网回读与安装脚本的校验函数实测通过 |
+| 前端 | `npm run build` 通过（含 `vue-tsc --noEmit` 类型检查），产物 `4fad24304c6f5459.js`（2 120 681 B）已嵌入 `web/html` |
+| amd64 | `s-ui-linux-amd64.tar.gz` 35 770 765 B（内含 `sui` 102 457 160 B），ELF 64 位 x86-64 全静态已 strip（节表无 `.symtab`/`.debug_*`，无动态解释器路径） |
+| 版本 | 包内二进制确认含 `1.6.3-mo9`；本版未在真机跑端到端安装（测试机凭据不可用），公网回读与安装脚本的校验函数实测通过 |
 
 早前的 `mo1` / `mo2` 在 Debian 12 / 1 核 / 973 MB 内存 VPS 上用 musl-gcc 构建并做过更完整的功能验证，
 其中后续版本仍然复用的结论：
@@ -437,7 +462,7 @@ rm -rf web/html && mkdir -p web/html && cp -r frontend/dist/* web/html/
 | `cmd/token.go` / `cmd/cmd.go` | `s-ui token` 子命令 |
 | `util/shadowsocks.go` | SS-2022 32 字节密钥方法 |
 | `config/config.go` | `PanelRepo` / `GetPanelRepo` |
-| `config/version` | `1.6.3-mo8` |
+| `config/version` | `1.6.3-mo9` |
 
 前端：
 

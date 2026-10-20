@@ -129,6 +129,8 @@ export default {
   },
   main: {
     tiles: "信息卡",
+    tilesAll: "全部",
+    tilesNone: "清空",
     gauges: "仪表板",
     charts: "图表",
     infos: "信息",
