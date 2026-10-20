@@ -129,7 +129,7 @@ SUI_AUTO=1 bash <(curl -Ls https://raw.githubusercontent.com/<你的仓库>/main
   在中转卡片上重新打开开关即可补一条新的；改名前先把开关关掉最干净。
 - 附带「导出链接」弹窗：所有客户端的订阅 URL / 全部分享链接（明文或 Base64 整包），直接粘进 v2rayN 批量导入。
 
-### 2.7 用户管理页批量导出 vless 链接
+### 2.7 用户管理页勾选批量导出 / 批量删除
 
 批量自动建站（2.6）一次能建出 N 个节点，建完之后最常做的事就是把这批链接
 整个拿走分发。以前只能逐个点二维码，或者去中转页的「导出链接」里拿**全部**
@@ -249,15 +249,15 @@ zig 方案本身，而是那台机器上的安全策略** —— 换到别的 Wi
 
 ### 4.3 本次构建与验证记录
 
-本次（`1.6.3-mo6`）在 Windows 本机交叉编译，交付物做了公网回读校验：
+本次（`1.6.3-mo7`）在 Windows 本机交叉编译，交付物做了公网回读校验：
 
 | 项目 | 结果 |
 |---|---|
 | 工具链 | Go 1.26.8 + zig 0.14.1（`zig cc -target x86_64-linux-musl`），`CGO_ENABLED=1` |
 | 链接 | `-linkmode external -extldflags '-static -s'`，产出全静态 ELF |
 | 前端 | `npm run build` 通过（含 `vue-tsc --noEmit` 类型检查），产物 `5218b09b8c2e33d6.js`（2 109 066 B）已嵌入 `web/html` |
-| amd64 | `s-ui-linux-amd64.tar.gz` 35 767 040 B（内含 `sui` 102 445 576 B），ELF 64 位 x86-64 全静态已 strip（节表无 `.symtab`/`.debug_*`，无动态解释器路径） |
-| 版本 | 包内二进制确认含 `1.6.3-mo6`；本版未在真机跑端到端安装（测试机凭据不可用），公网回读与安装脚本的校验函数实测通过 |
+| amd64 | `s-ui-linux-amd64.tar.gz` 35 767 043 B（内含 `sui` 102 445 576 B），ELF 64 位 x86-64 全静态已 strip（节表无 `.symtab`/`.debug_*`，无动态解释器路径） |
+| 版本 | 包内二进制确认含 `1.6.3-mo7`；本版未在真机跑端到端安装（测试机凭据不可用），公网回读与安装脚本的校验函数实测通过 |
 
 早前的 `mo1` / `mo2` 在 Debian 12 / 1 核 / 973 MB 内存 VPS 上用 musl-gcc 构建并做过更完整的功能验证，
 其中后续版本仍然复用的结论：
@@ -407,7 +407,7 @@ rm -rf web/html && mkdir -p web/html && cp -r frontend/dist/* web/html/
 | `cmd/token.go` / `cmd/cmd.go` | `s-ui token` 子命令 |
 | `util/shadowsocks.go` | SS-2022 32 字节密钥方法 |
 | `config/config.go` | `PanelRepo` / `GetPanelRepo` |
-| `config/version` | `1.6.3-mo6` |
+| `config/version` | `1.6.3-mo7` |
 
 前端：
 
