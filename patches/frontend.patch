@@ -1763,8 +1763,8 @@ diff -ruN
 +</script>
 diff -ruN
 --- a/src/locales/en.ts	2026-09-16 08:54:08.000000000 +0800
-+++ b/src/locales/en.ts	2026-10-20 21:28:23.100345600 +0800
-@@ -1,810 +1,918 @@
++++ b/src/locales/en.ts	2026-10-20 21:54:02.373093200 +0800
+@@ -1,810 +1,922 @@
 -export default {
 -  success: "success",
 -  failed: "failed",
@@ -2916,6 +2916,10 @@ diff -ruN
 +    exportEmpty: "No vless link to export",
 +    exportSelected: "Export vless links of {n} selected user(s)",
 +    clearSelection: "Clear selection",
++    delSelected: "Delete {n} selected user(s)",
++    delSelectedConfirm: "Delete the following {n} user(s)?",
++    delSelectedDone: "{n} user(s) deleted",
++    delSelectedFailed: "{ok} deleted, {err} failed: {names}",
 +    exportSummary: "{u} user(s) - {n} link(s)",
 +    copyUser: "Copy user",
 +    copyAll: "Copy all",
@@ -3495,8 +3499,8 @@ diff -ruN
 +}
 diff -ruN
 --- a/src/locales/zhcn.ts	2026-09-16 08:54:08.000000000 +0800
-+++ b/src/locales/zhcn.ts	2026-10-20 21:28:23.103337300 +0800
-@@ -1,808 +1,916 @@
++++ b/src/locales/zhcn.ts	2026-10-20 21:54:11.494441000 +0800
+@@ -1,808 +1,920 @@
 -export default {
 -  success: "成功",
 -  failed: "失败",
@@ -4646,6 +4650,10 @@ diff -ruN
 +    exportEmpty: "没有可导出的 vless 链接",
 +    exportSelected: "导出选中 {n} 个用户的 vless 链接",
 +    clearSelection: "取消选择",
++    delSelected: "删除选中的 {n} 个用户",
++    delSelectedConfirm: "确认删除以下 {n} 个用户？",
++    delSelectedDone: "已删除 {n} 个用户",
++    delSelectedFailed: "成功 {ok} 个，失败 {err} 个：{names}",
 +    exportSummary: "{u} 个用户 · {n} 条链接",
 +    copyUser: "复制该用户",
 +    copyAll: "复制全部",
@@ -5445,8 +5453,8 @@ diff -ruN
 +}
 diff -ruN
 --- a/src/views/Clients.vue	2026-09-16 08:54:08.000000000 +0800
-+++ b/src/views/Clients.vue	2026-10-20 21:28:13.885535700 +0800
-@@ -42,6 +42,12 @@
++++ b/src/views/Clients.vue	2026-10-20 21:53:52.075232000 +0800
+@@ -42,6 +42,49 @@
      :tag="sessions.tag"
      @close="closeSessions"
    />
@@ -5456,10 +5464,47 @@ diff -ruN
 +    :client-ids="exportIds"
 +    @close="closeExport"
 +  />
++  <v-dialog
++    v-model="delBulkModal"
++    width="auto"
++  >
++    <v-card
++      rounded="lg"
++      :title="$t('actions.del')"
++    >
++      <v-divider />
++      <v-card-text>
++        <p>{{ $t('client.delSelectedConfirm', { n: delBulkNames.length }) }}</p>
++        <p
++          class="mt-2"
++          style="font-size: 0.85rem; opacity: 0.8; word-break: break-all;"
++        >
++          {{ delBulkNames.join(', ') }}
++        </p>
++      </v-card-text>
++      <v-card-actions>
++        <v-btn
++          color="error"
++          variant="outlined"
++          :loading="delBulkLoading"
++          @click="delBulk"
++        >
++          {{ $t('yes') }}
++        </v-btn>
++        <v-btn
++          color="success"
++          variant="outlined"
++          @click="delBulkModal = false"
++        >
++          {{ $t('no') }}
++        </v-btn>
++      </v-card-actions>
++    </v-card>
++  </v-dialog>
    <v-dialog
      v-model="resetTrafficModal"
      width="auto"
-@@ -84,6 +90,27 @@
+@@ -84,6 +127,40 @@
        </v-btn>
      </v-col>
      <v-col cols="auto">
@@ -5477,6 +5522,19 @@ diff -ruN
 +      cols="auto"
 +    >
 +      <v-btn
++        color="error"
++        variant="tonal"
++        prepend-icon="mdi-delete"
++        @click="confirmDelBulk"
++      >
++        {{ $t('client.delSelected', { n: selected.length }) }}
++      </v-btn>
++    </v-col>
++    <v-col
++      v-if="selected.length > 0"
++      cols="auto"
++    >
++      <v-btn
 +        variant="text"
 +        @click="selected = []"
 +      >
@@ -5487,7 +5545,7 @@ diff -ruN
        <v-menu
          v-model="actionMenu"
          :close-on-content-click="false"
-@@ -216,6 +243,8 @@
+@@ -216,6 +293,8 @@
    <v-row>
      <v-col cols="12">
        <v-data-table
@@ -5496,7 +5554,7 @@ diff -ruN
          :headers="headers"
          :items="filterSettings.enabled ? filterSettings.filteredClients : clients"
          :hide-default-footer="filterSettings.enabled ? filterSettings.filteredClients.length<=10 : clients.length<=10"
-@@ -422,6 +451,7 @@
+@@ -422,6 +501,7 @@
  import QrCode from '@/layouts/modals/QrCode.vue'
  import Stats from '@/layouts/modals/Stats.vue'
  import Sessions from '@/layouts/modals/Sessions.vue'
@@ -5504,7 +5562,15 @@ diff -ruN
  import { Client } from '@/types/clients'
  import { Inbound } from '@/types/inbounds'
  import { computed, ref } from 'vue'
-@@ -578,6 +608,25 @@
+@@ -429,6 +509,7 @@
+ import { i18n, locale } from '@/locales'
+ import { useDisplay } from 'vuetify'
+ import HttpUtils from '@/plugins/httputil'
++import { push } from 'notivue'
+ 
+ const { smAndDown } = useDisplay()
+ 
+@@ -578,6 +659,73 @@
    sessions.value.visible = false
  }
  
@@ -5525,6 +5591,54 @@ diff -ruN
 +
 +const closeExport = () => {
 +  exportModal.value = false
++}
++
++// 勾选后批量删除。后端 api/save 的 clients/del 一次只收一个 id，所以是逐条发；
++// 走 HttpUtils 而不是 Data().save 是为了不刷 N 条成功通知 —— 删完统一弹一条
++// 汇总，成功几个、失败几个一眼看清（失败的多半是这个用户还挂在某个入站上）。
++const delBulkModal = ref(false)
++const delBulkLoading = ref(false)
++
++const delBulkNames = computed((): string[] => {
++  return clients.value.filter(c => selected.value.includes(c.name)).map(c => c.name)
++})
++
++const confirmDelBulk = () => {
++  delBulkModal.value = true
++}
++
++const delBulk = async () => {
++  delBulkLoading.value = true
++  const rows = clients.value.filter(c => selected.value.includes(c.name))
++  const failed = <string[]>[]
++  for (const c of rows) {
++    const msg = await HttpUtils.post('api/save', {
++      object: 'clients',
++      action: 'del',
++      data: JSON.stringify(c.id),
++    })
++    if (!msg.success) failed.push(c.name)
++  }
++  delBulkLoading.value = false
++  delBulkModal.value = false
++  selected.value = []
++  await Data().loadData()
++  if (failed.length == 0) {
++    push.success({
++      title: i18n.global.t('success'),
++      duration: 5000,
++      message: i18n.global.t('client.delSelectedDone', { n: rows.length }),
++    })
++  } else {
++    push.error({
++      duration: 8000,
++      message: i18n.global.t('client.delSelectedFailed', {
++        ok: rows.length - failed.length,
++        err: failed.length,
++        names: failed.join(', '),
++      }),
++    })
++  }
 +}
 +
  const doFilter = () => {

@@ -49,6 +49,43 @@
     @close="closeExport"
   />
   <v-dialog
+    v-model="delBulkModal"
+    width="auto"
+  >
+    <v-card
+      rounded="lg"
+      :title="$t('actions.del')"
+    >
+      <v-divider />
+      <v-card-text>
+        <p>{{ $t('client.delSelectedConfirm', { n: delBulkNames.length }) }}</p>
+        <p
+          class="mt-2"
+          style="font-size: 0.85rem; opacity: 0.8; word-break: break-all;"
+        >
+          {{ delBulkNames.join(', ') }}
+        </p>
+      </v-card-text>
+      <v-card-actions>
+        <v-btn
+          color="error"
+          variant="outlined"
+          :loading="delBulkLoading"
+          @click="delBulk"
+        >
+          {{ $t('yes') }}
+        </v-btn>
+        <v-btn
+          color="success"
+          variant="outlined"
+          @click="delBulkModal = false"
+        >
+          {{ $t('no') }}
+        </v-btn>
+      </v-card-actions>
+    </v-card>
+  </v-dialog>
+  <v-dialog
     v-model="resetTrafficModal"
     width="auto"
   >
@@ -97,6 +134,19 @@
         @click="exportModal = true"
       >
         {{ selected.length > 0 ? $t('client.exportSelected', { n: selected.length }) : $t('client.exportAll') }}
+      </v-btn>
+    </v-col>
+    <v-col
+      v-if="selected.length > 0"
+      cols="auto"
+    >
+      <v-btn
+        color="error"
+        variant="tonal"
+        prepend-icon="mdi-delete"
+        @click="confirmDelBulk"
+      >
+        {{ $t('client.delSelected', { n: selected.length }) }}
       </v-btn>
     </v-col>
     <v-col
@@ -459,6 +509,7 @@ import { HumanReadable } from '@/plugins/utils'
 import { i18n, locale } from '@/locales'
 import { useDisplay } from 'vuetify'
 import HttpUtils from '@/plugins/httputil'
+import { push } from 'notivue'
 
 const { smAndDown } = useDisplay()
 
@@ -625,6 +676,54 @@ const exportIds = computed((): number[] => {
 
 const closeExport = () => {
   exportModal.value = false
+}
+
+// 勾选后批量删除。后端 api/save 的 clients/del 一次只收一个 id，所以是逐条发；
+// 走 HttpUtils 而不是 Data().save 是为了不刷 N 条成功通知 —— 删完统一弹一条
+// 汇总，成功几个、失败几个一眼看清（失败的多半是这个用户还挂在某个入站上）。
+const delBulkModal = ref(false)
+const delBulkLoading = ref(false)
+
+const delBulkNames = computed((): string[] => {
+  return clients.value.filter(c => selected.value.includes(c.name)).map(c => c.name)
+})
+
+const confirmDelBulk = () => {
+  delBulkModal.value = true
+}
+
+const delBulk = async () => {
+  delBulkLoading.value = true
+  const rows = clients.value.filter(c => selected.value.includes(c.name))
+  const failed = <string[]>[]
+  for (const c of rows) {
+    const msg = await HttpUtils.post('api/save', {
+      object: 'clients',
+      action: 'del',
+      data: JSON.stringify(c.id),
+    })
+    if (!msg.success) failed.push(c.name)
+  }
+  delBulkLoading.value = false
+  delBulkModal.value = false
+  selected.value = []
+  await Data().loadData()
+  if (failed.length == 0) {
+    push.success({
+      title: i18n.global.t('success'),
+      duration: 5000,
+      message: i18n.global.t('client.delSelectedDone', { n: rows.length }),
+    })
+  } else {
+    push.error({
+      duration: 8000,
+      message: i18n.global.t('client.delSelectedFailed', {
+        ok: rows.length - failed.length,
+        err: failed.length,
+        names: failed.join(', '),
+      }),
+    })
+  }
 }
 
 const doFilter = () => {
