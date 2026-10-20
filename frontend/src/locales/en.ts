@@ -591,6 +591,13 @@ export default {
     multiDomain: "Multi Domain",
     remark: "Remark",
     mdOption: "Multi Domain Options",
+    users: "Inbound Users",
+    usersHint: "Clients bound to this inbound. Deleting a client removes it everywhere, not just from this inbound.",
+    noUsers: "No client is bound to this inbound",
+    delSelected: "Delete {n} selected inbound(s)",
+    delSelectedConfirm: "Delete the following {n} inbound(s)?",
+    delSelectedDone: "{n} inbound(s) deleted",
+    delSelectedFailed: "{ok} deleted, {err} failed: {names}",
   },
   listen: {
     options: "Listen Options",

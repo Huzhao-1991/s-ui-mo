@@ -167,6 +167,36 @@ SUI_AUTO=1 bash <(curl -Ls https://raw.githubusercontent.com/<你的仓库>/main
 弹窗只给明文，不做 Base64 整包、也不摆二维码：这一步的用途就是「复制走」，
 多一种格式就多一次点错的机会。
 
+### 2.8 入站管理改为列表 + 入站用户批量删除
+
+「入站管理」页（`Inbounds.vue`）原来是卡片网格，现在改成和「用户管理」页一致的
+`v-data-table`：一行一个入站，列依次是 tag / 类型 / 地址 / 端口 / TLS / 客户端数 /
+在线 / 操作。卡片上的四个操作（编辑、删除、克隆、流量统计）原样挪进操作列，
+图标与 tooltip 不变。
+
+信息密度是换掉卡片的主要原因：卡片一张占 1/6 屏宽，入站一多要翻好几屏才能比对，
+而且每张卡内部都要把「地址 / 端口 / TLS / 客户端」这些标签重复写一遍。
+
+**批量删除入站**：表格左侧勾选 → 工具栏出现「删除选中的 N 个入站」→ 二次确认
+（列出全部待删 tag）→ 逐条发 `api/save object=inbounds action=del`。
+后端一次只收一个 tag，所以只能循环；这里直接调 `HttpUtils.post` 而不是
+`Data().save`，避免删 N 个刷 N 条成功通知，改成最后统一弹一条汇总。
+
+**入站用户管理**：操作列新增 `mdi-account-multiple` 按钮，点开是该入站下挂的
+客户端表格（`layouts/modals/InboundUsers.vue`），格式同样与「用户管理」页一致，
+支持逐行编辑 / 二维码 / 删除，也可以勾选多行批量删除。
+
+两处删除的语义要分清：
+
+- **删入站** —— 只删这个入站条目。
+- **删入站里的用户** —— 彻底删除客户端记录（`object=clients action=del`），
+  它在**所有**入站上的绑定一起消失。只想换入口、保留账号的话，去「用户管理」
+  页改它的入站绑定，不要在这里删。
+
+列表来源只看绑定关系（`client.inbounds` 含本入站 id），与路由规则无关。
+后端保存 clients 时会把凭据写回绑定的入站（`UpdateInboundsUsers`），所以这张表
+既是「谁能从这个入站连进来」，也是 sing-box 配置里 `users` 的真相。
+
 ## 3. 相对原魔改版实现上的改进
 
 
@@ -249,15 +279,15 @@ zig 方案本身，而是那台机器上的安全策略** —— 换到别的 Wi
 
 ### 4.3 本次构建与验证记录
 
-本次（`1.6.3-mo7`）在 Windows 本机交叉编译，交付物做了公网回读校验：
+本次（`1.6.3-mo8`）在 Windows 本机交叉编译，交付物做了公网回读校验：
 
 | 项目 | 结果 |
 |---|---|
 | 工具链 | Go 1.26.8 + zig 0.14.1（`zig cc -target x86_64-linux-musl`），`CGO_ENABLED=1` |
 | 链接 | `-linkmode external -extldflags '-static -s'`，产出全静态 ELF |
-| 前端 | `npm run build` 通过（含 `vue-tsc --noEmit` 类型检查），产物 `5218b09b8c2e33d6.js`（2 109 066 B）已嵌入 `web/html` |
-| amd64 | `s-ui-linux-amd64.tar.gz` 35 767 043 B（内含 `sui` 102 445 576 B），ELF 64 位 x86-64 全静态已 strip（节表无 `.symtab`/`.debug_*`，无动态解释器路径） |
-| 版本 | 包内二进制确认含 `1.6.3-mo7`；本版未在真机跑端到端安装（测试机凭据不可用），公网回读与安装脚本的校验函数实测通过 |
+| 前端 | `npm run build` 通过（含 `vue-tsc --noEmit` 类型检查），产物 `c00374ebee45daf2.js`（2 119 903 B）已嵌入 `web/html` |
+| amd64 | `s-ui-linux-amd64.tar.gz` 35 771 554 B（内含 `sui` 102 456 392 B），ELF 64 位 x86-64 全静态已 strip（节表无 `.symtab`/`.debug_*`，无动态解释器路径） |
+| 版本 | 包内二进制确认含 `1.6.3-mo8`；本版未在真机跑端到端安装（测试机凭据不可用），公网回读与安装脚本的校验函数实测通过 |
 
 早前的 `mo1` / `mo2` 在 Debian 12 / 1 核 / 973 MB 内存 VPS 上用 musl-gcc 构建并做过更完整的功能验证，
 其中后续版本仍然复用的结论：
@@ -407,7 +437,7 @@ rm -rf web/html && mkdir -p web/html && cp -r frontend/dist/* web/html/
 | `cmd/token.go` / `cmd/cmd.go` | `s-ui token` 子命令 |
 | `util/shadowsocks.go` | SS-2022 32 字节密钥方法 |
 | `config/config.go` | `PanelRepo` / `GetPanelRepo` |
-| `config/version` | `1.6.3-mo7` |
+| `config/version` | `1.6.3-mo8` |
 
 前端：
 

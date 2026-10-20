@@ -591,6 +591,13 @@ export default {
     multiDomain: "多域名",
     remark: "备注",
     mdOption: "多域名选项",
+    users: "入站用户",
+    usersHint: "挂在这个入站上的客户端。删除客户端是彻底删除，它在所有入站上的绑定都会一起消失，不是只从本入站摘掉。",
+    noUsers: "这个入站上还没有挂任何客户端",
+    delSelected: "删除选中的 {n} 个入站",
+    delSelectedConfirm: "确认删除以下 {n} 个入站？",
+    delSelectedDone: "已删除 {n} 个入站",
+    delSelectedFailed: "成功 {ok} 个，失败 {err} 个：{names}",
   },
   listen: {
     options: "监听选项",
