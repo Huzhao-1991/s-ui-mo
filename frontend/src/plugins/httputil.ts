@@ -1,4 +1,5 @@
 import api from './api'
+import axios from 'axios'
 import { i18n } from '@/locales'
 import router from '@/router'
 import { push } from 'notivue'
@@ -104,6 +105,16 @@ const HttpUtils = {
         const resp = await api.get(url, { params: data, ...options })
         msg = _respToMsg<T>(resp)
     } catch (e: unknown) {
+        // A request cancelled by the duplicate-request interceptor is
+        // superseded, not failed -- a newer call with the same key is already
+        // on the wire and will answer for it. Reporting it as an error pops a
+        // spurious "failed" toast (e.g. "CanceledError: Duplicate request
+        // cancelled") while nothing actually went wrong. success=false keeps
+        // batch loops honest (the cancelled item really did not happen), and
+        // the empty msg keeps _handleMsg quiet.
+        if (axios.isCancel(e)) {
+            return _objectlessMsg<T>(false, "")
+        }
         const err = e as RequestError
         if (_sessionExpired(err?.response?.status, err?.response?.data?.msg)) {
             push.error({ title: i18n.global.t('invalidLogin') })
@@ -121,6 +132,9 @@ const HttpUtils = {
         const resp = await api.post(url, data, options)
         msg = _respToMsg<T>(resp)
     } catch (e: unknown) {
+        if (axios.isCancel(e)) {
+            return _objectlessMsg<T>(false, "")
+        }
         const err = e as RequestError
         if (_sessionExpired(err?.response?.status, err?.response?.data?.msg)) {
             push.error({ title: i18n.global.t('invalidLogin') })

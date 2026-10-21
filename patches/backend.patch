@@ -1,6 +1,6 @@
 diff -ruN
 --- a/.github/workflows/docker.yml	2026-09-16 08:54:30.000000000 +0800
-+++ b/.github/workflows/docker.yml	2026-10-05 18:10:44.722399000 +0800
++++ b/.github/workflows/docker.yml	2026-10-21 22:18:56.416553500 +0800
 @@ -1,11 +1,17 @@
  name: Docker Image CI
 +# 仅手动触发。上游是「推 tag 就跑」，但在本仓库里这样跑不通、也不该自动跑：
@@ -25,7 +25,7 @@ diff -ruN
    packages: write
 diff -ruN
 --- a/.github/workflows/release.yml	2026-09-16 08:54:30.000000000 +0800
-+++ b/.github/workflows/release.yml	2026-10-05 17:59:24.265421200 +0800
++++ b/.github/workflows/release.yml	2026-10-21 22:18:56.420515400 +0800
 @@ -1,14 +1,22 @@
  name: Release S-UI
  
@@ -116,7 +116,7 @@ diff -ruN
            mkdir s-ui-windows
 diff -ruN
 --- a/.gitignore	2026-09-16 08:54:30.000000000 +0800
-+++ b/.gitignore	2026-10-04 11:47:30.836977200 +0800
++++ b/.gitignore	2026-10-21 22:18:55.764387000 +0800
 @@ -10,6 +10,8 @@
  tmp
  .sync*
@@ -128,7 +128,7 @@ diff -ruN
  # local env files
 diff -ruN
 --- a/Dockerfile	2026-09-16 08:54:30.000000000 +0800
-+++ b/Dockerfile	2026-10-04 16:30:32.475934800 +0800
++++ b/Dockerfile	2026-10-21 22:18:55.763388600 +0800
 @@ -12,6 +12,8 @@
  WORKDIR /app
  ARG TARGETARCH
@@ -149,7 +149,7 @@ diff -ruN
  LABEL org.opencontainers.image.authors="alireza7@gmail.com"
 diff -ruN
 --- a/README-mo.md	1970-01-01 08:00:00.000000000 +0800
-+++ b/README-mo.md	2026-10-20 23:33:14.421976200 +0800
++++ b/README-mo.md	2026-10-21 22:47:50.275915700 +0800
 @@ -0,0 +1,499 @@
 +# S-UI 1.6.3 魔改版
 +
@@ -457,15 +457,15 @@ diff -ruN
 +
 +### 4.3 本次构建与验证记录
 +
-+本次（`1.6.3-mo9`）在 Windows 本机交叉编译，交付物做了公网回读校验：
++本次（`1.6.3-mo10`）在 Windows 本机交叉编译，交付物做了公网回读校验：
 +
 +| 项目 | 结果 |
 +|---|---|
 +| 工具链 | Go 1.26.8 + zig 0.14.1（`zig cc -target x86_64-linux-musl`），`CGO_ENABLED=1` |
 +| 链接 | `-linkmode external -extldflags '-static -s'`，产出全静态 ELF |
-+| 前端 | `npm run build` 通过（含 `vue-tsc --noEmit` 类型检查），产物 `4fad24304c6f5459.js`（2 120 681 B）已嵌入 `web/html` |
-+| amd64 | `s-ui-linux-amd64.tar.gz` 35 770 765 B（内含 `sui` 102 457 160 B），ELF 64 位 x86-64 全静态已 strip（节表无 `.symtab`/`.debug_*`，无动态解释器路径） |
-+| 版本 | 包内二进制确认含 `1.6.3-mo9`；本版未在真机跑端到端安装（测试机凭据不可用），公网回读与安装脚本的校验函数实测通过 |
++| 前端 | `npm run build` 通过（含 `vue-tsc --noEmit` 类型检查），产物 `e129c7c007d2b222.js`（2 120 757 B）已嵌入 `web/html` |
++| amd64 | `s-ui-linux-amd64.tar.gz` 35 771 347 B（内含 `sui` 102 457 288 B），ELF 64 位 x86-64 全静态已 strip（节表无 `.symtab`/`.debug_*`，无动态解释器路径） |
++| 版本 | 包内二进制确认含 `1.6.3-mo10`；本版未在真机跑端到端安装（测试机凭据不可用），公网回读与安装脚本的校验函数实测通过 |
 +
 +早前的 `mo1` / `mo2` 在 Debian 12 / 1 核 / 973 MB 内存 VPS 上用 musl-gcc 构建并做过更完整的功能验证，
 +其中后续版本仍然复用的结论：
@@ -615,7 +615,7 @@ diff -ruN
 +| `cmd/token.go` / `cmd/cmd.go` | `s-ui token` 子命令 |
 +| `util/shadowsocks.go` | SS-2022 32 字节密钥方法 |
 +| `config/config.go` | `PanelRepo` / `GetPanelRepo` |
-+| `config/version` | `1.6.3-mo9` |
++| `config/version` | `1.6.3-mo10` |
 +
 +前端：
 +
@@ -652,7 +652,7 @@ diff -ruN
 +`patches/backend.patch`、`patches/frontend.patch` 是相对上游的完整 diff，便于逐行审阅。
 diff -ruN
 --- a/README.md	2026-09-16 08:54:30.000000000 +0800
-+++ b/README.md	2026-10-05 17:18:53.672734500 +0800
++++ b/README.md	2026-10-21 22:18:55.774322900 +0800
 @@ -1,4 +1,11 @@
 -# S-UI
 +# S-UI面板魔改
@@ -668,7 +668,7 @@ diff -ruN
  ![](https://img.shields.io/github/v/release/alireza0/s-ui.svg)
 diff -ruN
 --- a/api/apiHandler.go	2026-09-16 08:54:30.000000000 +0800
-+++ b/api/apiHandler.go	2026-10-04 11:01:10.916365300 +0800
++++ b/api/apiHandler.go	2026-10-21 22:18:55.776305700 +0800
 @@ -27,6 +27,9 @@
  			checkLogin(c)
  		}
@@ -717,7 +717,7 @@ diff -ruN
  	}
 diff -ruN
 --- a/api/apiService.go	2026-09-16 08:54:30.000000000 +0800
-+++ b/api/apiService.go	2026-10-04 11:01:10.906392800 +0800
++++ b/api/apiService.go	2026-10-21 22:18:55.778324300 +0800
 @@ -28,6 +28,7 @@
  	service.PanelService
  	service.StatsService
@@ -766,7 +766,7 @@ diff -ruN
  	tag := c.Query("tag")
 diff -ruN
 --- a/api/remote.go	1970-01-01 08:00:00.000000000 +0800
-+++ b/api/remote.go	2026-10-04 13:06:25.070914600 +0800
++++ b/api/remote.go	2026-10-21 22:18:55.798204900 +0800
 @@ -0,0 +1,258 @@
 +package api
 +
@@ -1028,7 +1028,7 @@ diff -ruN
 +}
 diff -ruN
 --- a/build-release.sh	1970-01-01 08:00:00.000000000 +0800
-+++ b/build-release.sh	2026-10-05 17:25:19.190109700 +0800
++++ b/build-release.sh	2026-10-21 22:19:35.235353400 +0800
 @@ -0,0 +1,168 @@
 +#!/bin/sh
 +# Cross-compile the Linux release archives.
@@ -1200,7 +1200,7 @@ diff -ruN
 +exit 0
 diff -ruN
 --- a/cmd/cmd.go	2026-09-16 08:54:30.000000000 +0800
-+++ b/cmd/cmd.go	2026-10-04 11:01:51.944225100 +0800
++++ b/cmd/cmd.go	2026-10-21 22:18:55.820146900 +0800
 @@ -17,6 +17,7 @@
  	adminCmd := flag.NewFlagSet("admin", flag.ExitOnError)
  	settingCmd := flag.NewFlagSet("setting", flag.ExitOnError)
@@ -1254,7 +1254,7 @@ diff -ruN
  		if err != nil {
 diff -ruN
 --- a/cmd/token.go	1970-01-01 08:00:00.000000000 +0800
-+++ b/cmd/token.go	2026-10-04 11:01:51.164771700 +0800
++++ b/cmd/token.go	2026-10-21 22:18:55.878580000 +0800
 @@ -0,0 +1,43 @@
 +package cmd
 +
@@ -1301,7 +1301,7 @@ diff -ruN
 +}
 diff -ruN
 --- a/config/config.go	2026-09-16 08:54:30.000000000 +0800
-+++ b/config/config.go	2026-10-04 16:39:34.078505000 +0800
++++ b/config/config.go	2026-10-21 22:18:55.883566800 +0800
 @@ -28,6 +28,46 @@
  	return strings.TrimSpace(version)
  }
@@ -1351,15 +1351,15 @@ diff -ruN
  }
 diff -ruN
 --- a/config/version	2026-09-16 08:54:30.000000000 +0800
-+++ b/config/version	2026-10-20 23:31:03.807045100 +0800
++++ b/config/version	2026-10-21 22:43:32.773850900 +0800
 @@ -1 +1 @@
 -1.6.3
 \ No newline at end of file
-+1.6.3-mo9
++1.6.3-mo10
 \ No newline at end of file
 diff -ruN
 --- a/database/model/server.go	1970-01-01 08:00:00.000000000 +0800
-+++ b/database/model/server.go	2026-10-04 11:00:15.114743600 +0800
++++ b/database/model/server.go	2026-10-21 22:18:56.126984300 +0800
 @@ -0,0 +1,21 @@
 +package model
 +
@@ -1384,7 +1384,7 @@ diff -ruN
 +}
 diff -ruN
 --- a/database/schema.go	2026-09-16 08:54:30.000000000 +0800
-+++ b/database/schema.go	2026-10-04 11:00:31.994690100 +0800
++++ b/database/schema.go	2026-10-21 22:18:56.149922200 +0800
 @@ -31,6 +31,7 @@
  		{"stats", &model.Stats{}, copyRows[model.Stats]},
  		{"clients", &model.Client{}, copyRows[model.Client]},
@@ -1395,7 +1395,7 @@ diff -ruN
  
 diff -ruN
 --- a/install.sh	2026-09-16 08:54:30.000000000 +0800
-+++ b/install.sh	2026-10-04 17:06:50.246382300 +0800
++++ b/install.sh	2026-10-21 22:18:55.759400300 +0800
 @@ -8,6 +8,65 @@
  cur_dir=$(pwd)
  
@@ -1699,7 +1699,7 @@ diff -ruN
  install_s-ui $1
 diff -ruN
 --- a/s-ui.sh	2026-09-16 08:54:30.000000000 +0800
-+++ b/s-ui.sh	2026-10-04 16:29:01.585734200 +0800
++++ b/s-ui.sh	2026-10-21 22:18:55.761394100 +0800
 @@ -17,6 +17,27 @@
      echo -e "${green}[INF] $* ${plain}"
  }
@@ -1902,7 +1902,7 @@ diff -ruN
      esac
 diff -ruN
 --- a/service/config.go	2026-09-16 08:54:30.000000000 +0800
-+++ b/service/config.go	2026-10-04 11:00:44.421676200 +0800
++++ b/service/config.go	2026-10-21 22:18:56.198861700 +0800
 @@ -35,6 +35,7 @@
  	OutboundService
  	ServicesService
@@ -1925,7 +1925,7 @@ diff -ruN
  		if err != nil {
 diff -ruN
 --- a/service/panel.go	2026-09-16 08:54:30.000000000 +0800
-+++ b/service/panel.go	2026-10-04 16:39:42.283796100 +0800
++++ b/service/panel.go	2026-10-21 22:18:56.230568100 +0800
 @@ -1,11 +1,19 @@
  package service
  
@@ -2192,7 +2192,7 @@ diff -ruN
 +}
 diff -ruN
 --- a/service/serverlist.go	1970-01-01 08:00:00.000000000 +0800
-+++ b/service/serverlist.go	2026-10-04 11:00:15.343313700 +0800
++++ b/service/serverlist.go	2026-10-21 22:18:56.188887700 +0800
 @@ -0,0 +1,58 @@
 +package service
 +
@@ -2254,7 +2254,7 @@ diff -ruN
 +}
 diff -ruN
 --- a/service/user.go	2026-09-16 08:54:30.000000000 +0800
-+++ b/service/user.go	2026-10-04 11:01:51.936244000 +0800
++++ b/service/user.go	2026-10-21 22:18:56.254459700 +0800
 @@ -217,6 +217,27 @@
  // DeleteToken removes one of the caller's own API tokens. The owner check is
  // the point: the id came from the form with no constraint, so any logged-in
@@ -2285,7 +2285,7 @@ diff -ruN
  		return common.NewError("not logged in")
 diff -ruN
 --- a/setrepo.sh	1970-01-01 08:00:00.000000000 +0800
-+++ b/setrepo.sh	2026-10-04 16:30:17.125347700 +0800
++++ b/setrepo.sh	2026-10-21 22:18:55.749842900 +0800
 @@ -0,0 +1,43 @@
 +#!/bin/bash
 +# Point this checkout at the repository that will publish it.
@@ -2332,7 +2332,7 @@ diff -ruN
 +esac
 diff -ruN
 --- a/util/shadowsocks.go	2026-09-16 08:54:30.000000000 +0800
-+++ b/util/shadowsocks.go	2026-10-04 11:00:31.997685700 +0800
++++ b/util/shadowsocks.go	2026-10-21 22:18:56.296478500 +0800
 @@ -4,6 +4,8 @@
  	switch method {
  	case "2022-blake3-aes-128-gcm":
