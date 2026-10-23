@@ -144,6 +144,13 @@ export default {
     startCore: "Chạy lõi",
     restartSb: "Khởi động lại Singbox",
     closeSessions: "Ngắt kết nối người dùng",
+    moveUp: "Di chuyển lên",
+    moveDown: "Di chuyển xuống",
+  },
+  urlTest: {
+    custom: "URL kiểm tra tùy chỉnh",
+    url: "URL kiểm tra",
+    invalid: "Phải là URL http(s)",
   },
   login: {
     title: "Đăng nhập",
@@ -200,6 +207,8 @@ export default {
     path: "Đường dẫn mặc định",
     update: "Thời gian cập nhật tự động",
     subUri: "URI đăng ký",
+    subCustomHeaders: "Tiêu đề HTTP tùy chỉnh",
+    subCustomHeadersHint: "Tiêu đề thêm cho mọi đăng ký, mỗi dòng một \"Name: value\"; dòng bắt đầu bằng # bị bỏ qua",
     jsonSub: "Đăng ký JSON",
     toProxy: "Chuyển hướng tới Proxy",
     defaultRules: "Quy tắc mặc định",

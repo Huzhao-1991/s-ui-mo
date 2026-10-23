@@ -1,7 +1,9 @@
-# S-UI 1.6.3 魔改版
+# S-UI 1.6.5 魔改版
 
-基于 [alireza0/s-ui](https://github.com/alireza0/s-ui) **v1.6.3**（2026-09-16 发布）的二次开发版本，
-把 [Teminuosi/s-ui](https://github.com/Teminuosi/s-ui)（基于 v1.4.2）里已验证过的体验改进，重新移植到 1.6.3 上。
+基于 [alireza0/s-ui](https://github.com/alireza0/s-ui) **v1.6.5**（2026-10-15 发布）的二次开发版本。
+
+这个仓库从 1.6.3 起步，1.6.5 那一版的功能（`1.6.3-mo1` → `1.6.3-mo9`）整体平移到新基线上，
+版本串跟着上游走：`1.6.5-mo1` 起的后缀计数从头开始。
 
 上游版权归原作者，本项目遵循 GPL-3.0。
 
@@ -9,18 +11,18 @@
 
 ## 1. 和魔改版的关系：为什么没有照搬
 
-原魔改版基于 **v1.4.2**，而 1.6.3 中间隔了 1.5.0 → 1.6.3 共十个版本。逐文件比对后，
-**它 README 里主打的几项功能，上游早已并入，而且实现更好**，所以这次没有搬：
+原魔改版基于 **v1.4.2**，而 1.6.5 中间隔了 1.5.0 → 1.6.5 共十二个版本。逐文件比对后，
+**它 README 里主打的几项功能，上游早已并入，而且实现更好**，所以没有搬：
 
-| 魔改版声称的功能 | 1.6.3 现状 | 本次处置 |
+| 魔改版声称的功能 | 1.6.5 现状 | 本次处置 |
 |---|---|---|
 | 阶段1：协议模板（一键建 VLESS+Reality 等） | `core/protocol/` 已内置，且比魔改版**多** `snell`、`shadowsocks` | 不搬 |
 | `core/inbound_users.go` 客户端批量处理 | 已内置 | 不搬 |
 | Reject SSL handshake for unknown SNI | 已内置，且额外支持**证书热重载**（`certReloader`） | 不搬 |
 | hashed panel password | 已内置且更完整：`subtle.ConstantTimeCompare` + `BurnPasswordCheck` 防用户名枚举 | 不搬 |
-| 用 `X-Forwarded-For` 取客户端 IP | 1.6.3 改用 `c.ClientIP()`，走 gin 受信代理白名单，伪造头无效 | 不搬 |
+| 用 `X-Forwarded-For` 取客户端 IP | 1.6.5 改用 `c.ClientIP()`，走 gin 受信代理白名单，伪造头无效 | 不搬 |
 
-真正还差、本次移植的是下面五块。
+真正还差、需要自己动手的是下面这些。
 
 ---
 
@@ -304,15 +306,17 @@ zig 方案本身，而是那台机器上的安全策略** —— 换到别的 Wi
 
 ### 4.3 本次构建与验证记录
 
-本次（`1.6.3-mo10`）在 Windows 本机交叉编译，交付物做了公网回读校验：
+本次（`1.6.5-mo2`）在 Windows 本机交叉编译，交付物做了公网回读校验：
 
 | 项目 | 结果 |
 |---|---|
-| 工具链 | Go 1.26.8 + zig 0.14.1（`zig cc -target x86_64-linux-musl`），`CGO_ENABLED=1` |
+| 工具链 | **Go 1.27.2**（上游 1.6.5 的 `go.mod` 要求，1.6.3 只要求 1.26.7，低版本直接拒绝编译）+ zig 0.14.1（`zig cc -target x86_64-linux-musl`），`CGO_ENABLED=1` |
 | 链接 | `-linkmode external -extldflags '-static -s'`，产出全静态 ELF |
-| 前端 | `npm run build` 通过（含 `vue-tsc --noEmit` 类型检查），产物 `e129c7c007d2b222.js`（2 120 757 B）已嵌入 `web/html` |
-| amd64 | `s-ui-linux-amd64.tar.gz` 35 771 347 B（内含 `sui` 102 457 288 B），ELF 64 位 x86-64 全静态已 strip（节表无 `.symtab`/`.debug_*`，无动态解释器路径） |
-| 版本 | 包内二进制确认含 `1.6.3-mo10`；本版未在真机跑端到端安装（测试机凭据不可用），公网回读与安装脚本的校验函数实测通过 |
+| 前端 | 依赖升到 **TypeScript 6.0.3** / vuetify 4.2.6 / vite 8.3.4（1.6.3 是 TS 5.9.3 / 4.1.8 / 8.2.1）；`npm run build` 通过（含 `vue-tsc --noEmit` 类型检查，**零错误**），产物 `0c00b643c5521658.js`（2 133 190 B）已嵌入 `web/html` |
+| amd64 | `s-ui-linux-amd64.tar.gz` 35 279 142 B（内含 `sui` 99 948 328 B），ELF 64 位 x86-64 全静态已 strip（节表无 `.symtab`/`.debug_*`，无动态解释器路径） |
+| 版本 | 包内二进制确认含 `1.6.5-mo2`；本版未在真机跑端到端安装（测试机凭据不可用），公网回读与安装脚本的校验函数实测通过 |
+
+比 1.6.3 基线小了约 2.5 MB（`sui` 102 457 288 → 99 948 328 B），来自上游这版自身的变化。
 
 早前的 `mo1` / `mo2` 在 Debian 12 / 1 核 / 973 MB 内存 VPS 上用 musl-gcc 构建并做过更完整的功能验证，
 其中后续版本仍然复用的结论：
@@ -402,7 +406,7 @@ CI 发布时会自动用 `-X .../config.PanelRepo=${{ github.repository }}` 把�
 ├── api/ cmd/ config/ core/ database/ service/ util/ ...     Go 后端
 ├── frontend/src/          前端源码（含 Relay.vue / RelayWizard.vue / ExportLinks.vue 等改动）
 ├── web/html/              前端构建产物，被 go:embed 打进二进制
-├── patches/               相对上游 1.6.3 的完整 diff
+├── patches/               相对上游 1.6.5 的完整 diff
 ├── install.sh             一键安装脚本
 ├── build-release.sh       跨平台交叉编译 + 打包
 └── README-mo.md           本文档
@@ -462,7 +466,7 @@ rm -rf web/html && mkdir -p web/html && cp -r frontend/dist/* web/html/
 | `cmd/token.go` / `cmd/cmd.go` | `s-ui token` 子命令 |
 | `util/shadowsocks.go` | SS-2022 32 字节密钥方法 |
 | `config/config.go` | `PanelRepo` / `GetPanelRepo` |
-| `config/version` | `1.6.3-mo10` |
+| `config/version` | `1.6.5-mo2` |
 
 前端：
 

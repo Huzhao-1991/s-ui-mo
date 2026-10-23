@@ -144,6 +144,13 @@ export default {
     startCore: "اجرای هسته",
     restartSb: "ریستارت سینگ‌باکس",
     closeSessions: "قطع اتصال کاربر",
+    moveUp: "انتقال به بالا",
+    moveDown: "انتقال به پایین",
+  },
+  urlTest: {
+    custom: "آدرس تست دلخواه",
+    url: "آدرس تست",
+    invalid: "باید یک آدرس http(s) باشد",
   },
   login: {
     title: "ورود",
@@ -200,6 +207,8 @@ export default {
     path: "مسیر پیشفرض",
     update: "زمان بروزرسانی خودکار",
     subUri: "آدرس نهایی سابسکریپشن",
+    subCustomHeaders: "هدرهای سفارشی HTTP",
+    subCustomHeadersHint: "هدرهای اضافه برای همهٔ سابسکریپشن‌ها، هر خط یک «Name: value»؛ خطوطی که با # شروع شوند نادیده گرفته می‌شوند",
     jsonSub: "سابسکریپشن JSON",
     toProxy: "هدایت به پروکسی",
     defaultRules: "قوانین پیش‌فرض",

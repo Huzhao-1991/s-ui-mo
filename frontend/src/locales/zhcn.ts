@@ -42,10 +42,8 @@ export default {
     login: "登录",
     home: "主页",
     inbounds: "入站管理",
-    relay: "中转管理",
     outbounds: "出站管理",
     services: "服务管理",
-    servers: "服务器",
     endpoints: "节点管理",
     clients: "用户管理",
     rules: "路由列表",
@@ -54,8 +52,9 @@ export default {
     dns: "DNS",
     admins: "管理员",
     settings: "设置",
+    relay: "中转管理",
+    servers: "服务器",
   },
-  // 中转管理：把入口入站的流量经落地节点转发出去
   relay: {
     btn: "添加中转",
     title: "添加中转",
@@ -113,7 +112,6 @@ export default {
     parseFailLine: "第 {n} 行无法解析,未创建任何东西。",
     noPort: "无可用端口",
   },
-  // 导出链接：把客户端的订阅地址 / 分享链接批量导出给外部工具
   exportLinks: {
     btn: "导出",
     title: "导出链接",
@@ -129,8 +127,6 @@ export default {
   },
   main: {
     tiles: "信息卡",
-    tilesAll: "全部",
-    tilesNone: "清空",
     gauges: "仪表板",
     charts: "图表",
     infos: "信息",
@@ -171,6 +167,8 @@ export default {
       title: "使用量与统计",
       totalUsage: "总用量",
     },
+    tilesAll: "全部",
+    tilesNone: "清空",
   },
   objects: {
     inbound: "入站",
@@ -181,7 +179,6 @@ export default {
     rule: "规则",
     ruleset: "规则集",
     service: "服务",
-    server: "服务器",
     dnsserver: "DNS 服务器",
     dnsrule: "DNS规则",
     user: "用户",
@@ -194,6 +191,7 @@ export default {
     headers: "标头",
     key: "键",
     value: "值",
+    server: "服务器",
   },
   actions: {
     action: "操作",
@@ -221,6 +219,8 @@ export default {
     startCore: "启动内核",
     restartSb: "重启 Singbox",
     closeSessions: "断开该用户",
+    moveUp: "上移",
+    moveDown: "下移",
     updatePanel: "更新面板",
     updateConfirm: "现在更新面板？面板会重新安装并重启。",
     updateStarted: "已开始更新面板",
@@ -244,6 +244,11 @@ export default {
     backToLocal: "返回本机面板",
     empty: "还没有保存任何服务器。",
     wipeNodes: "同时删除该服务器上的全部入站（不可撤销）",
+  },
+  urlTest: {
+    custom: "自定义测试 URL",
+    url: "测试 URL",
+    invalid: "必须是 http(s) URL",
   },
   login: {
     title: "登录",
@@ -300,6 +305,8 @@ export default {
     path: "默认路径",
     update: "自动更新时间",
     subUri: "订阅 URI",
+    subCustomHeaders: "自定义 HTTP 标头",
+    subCustomHeadersHint: "随每个订阅发送的额外标头，每行一个 \"Name: value\"；以 # 开头的行将被忽略",
     jsonSub: "JSON 订阅",
     toProxy: "路由到代理",
     defaultRules: "默认规则",

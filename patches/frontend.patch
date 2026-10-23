@@ -1,6 +1,439 @@
 diff -ruN
---- a/src/components/Main.vue	2026-09-16 08:54:08.000000000 +0800
-+++ b/src/components/Main.vue	2026-10-21 22:19:34.743672100 +0800
+--- C:\Users\Administrator\WorkBuddy\2026-10-04-10-51-07\suiwork\x\s-ui-frontend-1.6.5/package-lock.json	2026-10-15 18:53:46.000000000 +0800
++++ b/package-lock.json	2026-10-23 21:48:03.070045500 +0800
+@@ -505,6 +505,7 @@
+       "version": "2.6.0",
+       "resolved": "https://registry.npmjs.org/@parcel/watcher/-/watcher-2.6.0.tgz",
+       "integrity": "sha512-7FNeNl8NCE7aINx7WXiKQrPYZWC/hvrTsmk6zmxbI7LTXE7hVek/n8AfVgpe2y82zl3w0HvCHN0bVKMBoJcC0w==",
++      "dev": true,
+       "hasInstallScript": true,
+       "license": "MIT",
+       "optional": true,
+@@ -543,6 +544,7 @@
+       "cpu": [
+         "arm64"
+       ],
++      "dev": true,
+       "license": "MIT",
+       "optional": true,
+       "os": [
+@@ -563,6 +565,7 @@
+       "cpu": [
+         "arm64"
+       ],
++      "dev": true,
+       "license": "MIT",
+       "optional": true,
+       "os": [
+@@ -583,6 +586,7 @@
+       "cpu": [
+         "x64"
+       ],
++      "dev": true,
+       "license": "MIT",
+       "optional": true,
+       "os": [
+@@ -603,6 +607,7 @@
+       "cpu": [
+         "x64"
+       ],
++      "dev": true,
+       "license": "MIT",
+       "optional": true,
+       "os": [
+@@ -623,9 +628,7 @@
+       "cpu": [
+         "arm"
+       ],
+-      "libc": [
+-        "glibc"
+-      ],
++      "dev": true,
+       "license": "MIT",
+       "optional": true,
+       "os": [
+@@ -646,9 +649,7 @@
+       "cpu": [
+         "arm"
+       ],
+-      "libc": [
+-        "musl"
+-      ],
++      "dev": true,
+       "license": "MIT",
+       "optional": true,
+       "os": [
+@@ -669,9 +670,7 @@
+       "cpu": [
+         "arm64"
+       ],
+-      "libc": [
+-        "glibc"
+-      ],
++      "dev": true,
+       "license": "MIT",
+       "optional": true,
+       "os": [
+@@ -692,9 +691,7 @@
+       "cpu": [
+         "arm64"
+       ],
+-      "libc": [
+-        "musl"
+-      ],
++      "dev": true,
+       "license": "MIT",
+       "optional": true,
+       "os": [
+@@ -715,9 +712,7 @@
+       "cpu": [
+         "x64"
+       ],
+-      "libc": [
+-        "glibc"
+-      ],
++      "dev": true,
+       "license": "MIT",
+       "optional": true,
+       "os": [
+@@ -738,9 +733,7 @@
+       "cpu": [
+         "x64"
+       ],
+-      "libc": [
+-        "musl"
+-      ],
++      "dev": true,
+       "license": "MIT",
+       "optional": true,
+       "os": [
+@@ -761,6 +754,7 @@
+       "cpu": [
+         "arm64"
+       ],
++      "dev": true,
+       "license": "MIT",
+       "optional": true,
+       "os": [
+@@ -781,6 +775,7 @@
+       "cpu": [
+         "x64"
+       ],
++      "dev": true,
+       "license": "MIT",
+       "optional": true,
+       "os": [
+@@ -817,6 +812,7 @@
+       "cpu": [
+         "arm"
+       ],
++      "dev": true,
+       "license": "MIT",
+       "optional": true,
+       "os": [
+@@ -833,6 +829,7 @@
+       "cpu": [
+         "arm64"
+       ],
++      "dev": true,
+       "license": "MIT",
+       "optional": true,
+       "os": [
+@@ -849,6 +846,7 @@
+       "cpu": [
+         "arm64"
+       ],
++      "dev": true,
+       "license": "MIT",
+       "optional": true,
+       "os": [
+@@ -865,6 +863,7 @@
+       "cpu": [
+         "x64"
+       ],
++      "dev": true,
+       "license": "MIT",
+       "optional": true,
+       "os": [
+@@ -881,6 +880,7 @@
+       "cpu": [
+         "x64"
+       ],
++      "dev": true,
+       "license": "MIT",
+       "optional": true,
+       "os": [
+@@ -897,6 +897,7 @@
+       "cpu": [
+         "arm"
+       ],
++      "dev": true,
+       "license": "MIT",
+       "optional": true,
+       "os": [
+@@ -913,9 +914,7 @@
+       "cpu": [
+         "arm64"
+       ],
+-      "libc": [
+-        "glibc"
+-      ],
++      "dev": true,
+       "license": "MIT",
+       "optional": true,
+       "os": [
+@@ -932,9 +931,7 @@
+       "cpu": [
+         "arm64"
+       ],
+-      "libc": [
+-        "musl"
+-      ],
++      "dev": true,
+       "license": "MIT",
+       "optional": true,
+       "os": [
+@@ -951,9 +948,7 @@
+       "cpu": [
+         "ppc64"
+       ],
+-      "libc": [
+-        "glibc"
+-      ],
++      "dev": true,
+       "license": "MIT",
+       "optional": true,
+       "os": [
+@@ -970,9 +965,7 @@
+       "cpu": [
+         "s390x"
+       ],
+-      "libc": [
+-        "glibc"
+-      ],
++      "dev": true,
+       "license": "MIT",
+       "optional": true,
+       "os": [
+@@ -989,9 +982,7 @@
+       "cpu": [
+         "x64"
+       ],
+-      "libc": [
+-        "glibc"
+-      ],
++      "dev": true,
+       "license": "MIT",
+       "optional": true,
+       "os": [
+@@ -1008,9 +999,7 @@
+       "cpu": [
+         "x64"
+       ],
+-      "libc": [
+-        "musl"
+-      ],
++      "dev": true,
+       "license": "MIT",
+       "optional": true,
+       "os": [
+@@ -1027,6 +1016,7 @@
+       "cpu": [
+         "arm64"
+       ],
++      "dev": true,
+       "license": "MIT",
+       "optional": true,
+       "os": [
+@@ -1043,6 +1033,7 @@
+       "cpu": [
+         "arm64"
+       ],
++      "dev": true,
+       "license": "MIT",
+       "optional": true,
+       "os": [
+@@ -1059,6 +1050,7 @@
+       "cpu": [
+         "x64"
+       ],
++      "dev": true,
+       "license": "MIT",
+       "optional": true,
+       "os": [
+@@ -1117,7 +1109,7 @@
+       "version": "26.6.5",
+       "resolved": "https://registry.npmjs.org/@types/node/-/node-26.6.5.tgz",
+       "integrity": "sha512-uMzsv9stDdofIZBx4UGh4Z9ZgXnGC9seRDscilBcTHAeOFk67MZg/k9bWVfO+bk4qZmG+l52hRnLwUiH2LnJTg==",
+-      "devOptional": true,
++      "dev": true,
+       "license": "MIT",
+       "dependencies": {
+         "undici-types": "~8.9.0"
+@@ -2621,6 +2613,7 @@
+       "version": "2.3.3",
+       "resolved": "https://registry.npmjs.org/fsevents/-/fsevents-2.3.3.tgz",
+       "integrity": "sha512-5xoDfX+fL7faATnagmWPpbFtwh/R77WmMMqqHGS65C3vvB0YHrgF+B1YmZ3441tMj5n63k0212XNoJwzlhffQw==",
++      "dev": true,
+       "hasInstallScript": true,
+       "license": "MIT",
+       "optional": true,
+@@ -2853,7 +2846,7 @@
+       "version": "5.1.9",
+       "resolved": "https://registry.npmjs.org/immutable/-/immutable-5.1.9.tgz",
+       "integrity": "sha512-m8nVez3rwrgmWxtLMt1ZYXB2Lv7OKYn/disyxAlSDYAlKSlFoPPfIAmAM/M5xqL4m4C/wAPw7S2/CNaUii1Hxg==",
+-      "devOptional": true,
++      "dev": true,
+       "license": "MIT"
+     },
+     "node_modules/imurmurhash": {
+@@ -2894,7 +2887,7 @@
+       "version": "2.1.1",
+       "resolved": "https://registry.npmjs.org/is-extglob/-/is-extglob-2.1.1.tgz",
+       "integrity": "sha512-SbKbANkN603Vi4jEZv49LeVJMn4yGwsbzZworEoyEiutsN3nJYdbO36zfhGJ6QEDpOZIFkDtnq5JRxmvl3jsoQ==",
+-      "devOptional": true,
++      "dev": true,
+       "license": "MIT",
+       "engines": {
+         "node": ">=0.10.0"
+@@ -2904,7 +2897,7 @@
+       "version": "4.0.3",
+       "resolved": "https://registry.npmjs.org/is-glob/-/is-glob-4.0.3.tgz",
+       "integrity": "sha512-xelSayHH36ZgE7ZWhli7pW34hNbNl8Ojv5KVmkJD4hBdD3th8Tfk9vYasLM+mXWOZhFkgZfxhLSnrwRr4elSSg==",
+-      "devOptional": true,
++      "dev": true,
+       "license": "MIT",
+       "dependencies": {
+         "is-extglob": "^2.1.1"
+@@ -3030,6 +3023,7 @@
+       "cpu": [
+         "arm64"
+       ],
++      "dev": true,
+       "license": "MPL-2.0",
+       "optional": true,
+       "os": [
+@@ -3050,6 +3044,7 @@
+       "cpu": [
+         "arm64"
+       ],
++      "dev": true,
+       "license": "MPL-2.0",
+       "optional": true,
+       "os": [
+@@ -3070,6 +3065,7 @@
+       "cpu": [
+         "x64"
+       ],
++      "dev": true,
+       "license": "MPL-2.0",
+       "optional": true,
+       "os": [
+@@ -3090,6 +3086,7 @@
+       "cpu": [
+         "x64"
+       ],
++      "dev": true,
+       "license": "MPL-2.0",
+       "optional": true,
+       "os": [
+@@ -3110,6 +3107,7 @@
+       "cpu": [
+         "arm"
+       ],
++      "dev": true,
+       "license": "MPL-2.0",
+       "optional": true,
+       "os": [
+@@ -3130,9 +3128,7 @@
+       "cpu": [
+         "arm64"
+       ],
+-      "libc": [
+-        "glibc"
+-      ],
++      "dev": true,
+       "license": "MPL-2.0",
+       "optional": true,
+       "os": [
+@@ -3153,9 +3149,7 @@
+       "cpu": [
+         "arm64"
+       ],
+-      "libc": [
+-        "musl"
+-      ],
++      "dev": true,
+       "license": "MPL-2.0",
+       "optional": true,
+       "os": [
+@@ -3176,9 +3170,7 @@
+       "cpu": [
+         "x64"
+       ],
+-      "libc": [
+-        "glibc"
+-      ],
++      "dev": true,
+       "license": "MPL-2.0",
+       "optional": true,
+       "os": [
+@@ -3199,9 +3191,7 @@
+       "cpu": [
+         "x64"
+       ],
+-      "libc": [
+-        "musl"
+-      ],
++      "dev": true,
+       "license": "MPL-2.0",
+       "optional": true,
+       "os": [
+@@ -3222,6 +3212,7 @@
+       "cpu": [
+         "arm64"
+       ],
++      "dev": true,
+       "license": "MPL-2.0",
+       "optional": true,
+       "os": [
+@@ -3242,6 +3233,7 @@
+       "cpu": [
+         "x64"
+       ],
++      "dev": true,
+       "license": "MPL-2.0",
+       "optional": true,
+       "os": [
+@@ -3497,6 +3489,7 @@
+       "version": "7.1.1",
+       "resolved": "https://registry.npmjs.org/node-addon-api/-/node-addon-api-7.1.1.tgz",
+       "integrity": "sha512-5m3bsyrjFWE1xf7nz7YXdN4udnVtXK6/Yfgn5qnahL6bCkf2yKt4k3nuTKAtT4r3IG8JNR2ncsIMdZuAzJjHQQ==",
++      "dev": true,
+       "license": "MIT",
+       "optional": true
+     },
+@@ -3994,7 +3987,7 @@
+       "version": "1.105.1",
+       "resolved": "https://registry.npmjs.org/sass/-/sass-1.105.1.tgz",
+       "integrity": "sha512-1CnAWPyrrnVQzXGB/DUep1vYCKCm1CIBr+YxjjiW6wk9qtzemnGP4qicH56T2F9S4Hjtv/Ne3jDz8JqfdDU4oA==",
+-      "devOptional": true,
++      "dev": true,
+       "license": "MIT",
+       "dependencies": {
+         "chokidar": "^5.0.0",
+@@ -4191,7 +4184,7 @@
+       "version": "8.9.0",
+       "resolved": "https://registry.npmjs.org/undici-types/-/undici-types-8.9.0.tgz",
+       "integrity": "sha512-KTDyRTYX8sWmKXAikPHHSyc63CRPETMctyjKFupcC6OBLXT3xsN0e9aF7m+mIXutFWpUXuedtowG7iLOzp0kQg==",
+-      "devOptional": true,
++      "dev": true,
+       "license": "MIT"
+     },
+     "node_modules/unplugin": {
+diff -ruN
+--- C:\Users\Administrator\WorkBuddy\2026-10-04-10-51-07\suiwork\x\s-ui-frontend-1.6.5/src/components/Main.vue	2026-10-15 18:53:46.000000000 +0800
++++ b/src/components/Main.vue	2026-10-23 21:48:03.367250900 +0800
 @@ -49,6 +49,25 @@
                    </v-col>
                    <v-spacer />
@@ -84,8 +517,8 @@ diff -ruN
  }
  
 diff -ruN
---- a/src/layouts/default/Drawer.vue	2026-09-16 08:54:08.000000000 +0800
-+++ b/src/layouts/default/Drawer.vue	2026-10-21 22:19:34.923121400 +0800
+--- C:\Users\Administrator\WorkBuddy\2026-10-04-10-51-07\suiwork\x\s-ui-frontend-1.6.5/src/layouts/default/Drawer.vue	2026-10-15 18:53:46.000000000 +0800
++++ b/src/layouts/default/Drawer.vue	2026-10-23 21:48:03.157812500 +0800
 @@ -11,6 +11,8 @@
        height="63"
        prepend-avatar="@/assets/logo.svg"
@@ -130,8 +563,8 @@ diff -ruN
    { title: 'pages.basics', icon: 'mdi-application-cog',  path: '/basics' },
    { title: 'pages.rules', icon: 'mdi-routes',  path: '/rules' },
 diff -ruN
---- a/src/layouts/modals/Client.vue	2026-09-16 08:54:08.000000000 +0800
-+++ b/src/layouts/modals/Client.vue	2026-10-21 22:19:34.938079300 +0800
+--- C:\Users\Administrator\WorkBuddy\2026-10-04-10-51-07\suiwork\x\s-ui-frontend-1.6.5/src/layouts/modals/Client.vue	2026-10-15 18:53:46.000000000 +0800
++++ b/src/layouts/modals/Client.vue	2026-10-23 21:48:03.150829400 +0800
 @@ -454,6 +454,12 @@
      id: { type: Number, required: true },
      inboundTags: { type: Array as PropType<InboundTag[]>, required: true },
@@ -158,8 +591,8 @@ diff -ruN
          this.clientConfig = randomConfigs('client')
        }
 diff -ruN
---- a/src/layouts/modals/ClientLinks.vue	1970-01-01 08:00:00.000000000 +0800
-+++ b/src/layouts/modals/ClientLinks.vue	2026-10-21 22:19:35.018865100 +0800
+--- C:\Users\Administrator\WorkBuddy\2026-10-04-10-51-07\suiwork\x\s-ui-frontend-1.6.5/src/layouts/modals/ClientLinks.vue	1970-01-01 08:00:00.000000000 +0800
++++ b/src/layouts/modals/ClientLinks.vue	2026-10-23 21:48:03.148834500 +0800
 @@ -0,0 +1,205 @@
 +<template>
 +  <!-- ======================================================================
@@ -367,8 +800,8 @@ diff -ruN
 +}
 +</script>
 diff -ruN
---- a/src/layouts/modals/ExportLinks.vue	1970-01-01 08:00:00.000000000 +0800
-+++ b/src/layouts/modals/ExportLinks.vue	2026-10-21 22:19:35.016869600 +0800
+--- C:\Users\Administrator\WorkBuddy\2026-10-04-10-51-07\suiwork\x\s-ui-frontend-1.6.5/src/layouts/modals/ExportLinks.vue	1970-01-01 08:00:00.000000000 +0800
++++ b/src/layouts/modals/ExportLinks.vue	2026-10-23 21:48:03.140856000 +0800
 @@ -0,0 +1,197 @@
 +<template>
 +  <!-- ======================================================================
@@ -568,8 +1001,8 @@ diff -ruN
 +}
 +</script>
 diff -ruN
---- a/src/layouts/modals/InboundUsers.vue	1970-01-01 08:00:00.000000000 +0800
-+++ b/src/layouts/modals/InboundUsers.vue	2026-10-21 22:19:35.011884100 +0800
+--- C:\Users\Administrator\WorkBuddy\2026-10-04-10-51-07\suiwork\x\s-ui-frontend-1.6.5/src/layouts/modals/InboundUsers.vue	1970-01-01 08:00:00.000000000 +0800
++++ b/src/layouts/modals/InboundUsers.vue	2026-10-23 21:48:03.142852100 +0800
 @@ -0,0 +1,468 @@
 +<template>
 +  <!-- ======================================================================
@@ -1040,8 +1473,8 @@ diff -ruN
 +}
 +</script>
 diff -ruN
---- a/src/layouts/modals/RelayUsers.vue	1970-01-01 08:00:00.000000000 +0800
-+++ b/src/layouts/modals/RelayUsers.vue	2026-10-21 22:19:35.013876500 +0800
+--- C:\Users\Administrator\WorkBuddy\2026-10-04-10-51-07\suiwork\x\s-ui-frontend-1.6.5/src/layouts/modals/RelayUsers.vue	1970-01-01 08:00:00.000000000 +0800
++++ b/src/layouts/modals/RelayUsers.vue	2026-10-23 21:48:03.144846100 +0800
 @@ -0,0 +1,494 @@
 +<template>
 +  <!-- ======================================================================
@@ -1538,8 +1971,8 @@ diff -ruN
 +}
 +</script>
 diff -ruN
---- a/src/layouts/modals/RelayWizard.vue	1970-01-01 08:00:00.000000000 +0800
-+++ b/src/layouts/modals/RelayWizard.vue	2026-10-21 22:19:35.007894900 +0800
+--- C:\Users\Administrator\WorkBuddy\2026-10-04-10-51-07\suiwork\x\s-ui-frontend-1.6.5/src/layouts/modals/RelayWizard.vue	1970-01-01 08:00:00.000000000 +0800
++++ b/src/layouts/modals/RelayWizard.vue	2026-10-23 21:48:03.146840200 +0800
 @@ -0,0 +1,637 @@
 +<template>
 +  <!-- ======================================================================
@@ -2179,8 +2612,8 @@ diff -ruN
 +}
 +</script>
 diff -ruN
---- a/src/layouts/modals/Server.vue	1970-01-01 08:00:00.000000000 +0800
-+++ b/src/layouts/modals/Server.vue	2026-10-21 22:19:34.928106300 +0800
+--- C:\Users\Administrator\WorkBuddy\2026-10-04-10-51-07\suiwork\x\s-ui-frontend-1.6.5/src/layouts/modals/Server.vue	1970-01-01 08:00:00.000000000 +0800
++++ b/src/layouts/modals/Server.vue	2026-10-23 21:48:03.147837300 +0800
 @@ -0,0 +1,136 @@
 +<template>
 +  <v-dialog
@@ -2319,24 +2752,15 @@ diff -ruN
 +}
 +</script>
 diff -ruN
---- a/src/locales/en.ts	2026-09-16 08:54:08.000000000 +0800
-+++ b/src/locales/en.ts	2026-10-21 22:23:16.975817100 +0800
-@@ -42,8 +42,10 @@
-     login: "Login",
-     home: "Home",
-     inbounds: "Inbounds",
-+    relay: "Relay",
-     outbounds: "Outbounds",
-     services: "Services",
-+    servers: "Servers",
-     endpoints: "Endpoints",
-     clients: "Clients",
-     rules: "Rules",
-@@ -53,8 +55,82 @@
+--- C:\Users\Administrator\WorkBuddy\2026-10-04-10-51-07\suiwork\x\s-ui-frontend-1.6.5/src/locales/en.ts	2026-10-15 18:53:46.000000000 +0800
++++ b/src/locales/en.ts	2026-10-23 21:48:03.159806600 +0800
+@@ -52,6 +52,78 @@
+     dns: "DNS",
      admins: "Admins",
      settings: "Settings",
-   },
-+  // Relay management: forward an inbound's traffic out through a landing node
++    relay: "Relay",
++    servers: "Servers",
++  },
 +  relay: {
 +    btn: "Add Relay",
 +    title: "Add Relay (Transit)",
@@ -2394,7 +2818,6 @@ diff -ruN
 +    parseFailLine: "Line {n} could not be parsed — nothing was created.",
 +    noPort: "no free port",
 +  },
-+  // Export links: bulk-export client subscriptions / share links
 +  exportLinks: {
 +    btn: "Export",
 +    title: "Export Links",
@@ -2407,26 +2830,30 @@ diff -ruN
 +    subTab: "Subscription",
 +    linksTab: "All Links",
 +    subDesc: "Add one subscription URL to your client (v2rayN / Shadowrocket) — it pulls every protocol of that client and auto-updates.",
-+  },
+   },
    main: {
      tiles: "Tiles",
+@@ -95,6 +167,8 @@
+       title: "Usage & Counts",
+       totalUsage: "Total Usage",
+     },
 +    tilesAll: "All",
 +    tilesNone: "None",
-     gauges: "Gauges",
-     charts: "Charts",
-     infos: "Information",
-@@ -105,6 +181,7 @@
-     rule: "Rule",
-     ruleset: "Ruleset",
-     service: "Service",
+   },
+   objects: {
+     inbound: "Inbound",
+@@ -117,6 +191,7 @@
+     headers: "Headers",
+     key: "Key",
+     value: "Value",
 +    server: "Server",
-     dnsserver: "DNS Server",
-     dnsrule: "DNS Rule",
-     user: "User",
-@@ -144,6 +221,29 @@
-     startCore: "Start Core",
-     restartSb: "Restart Singbox",
+   },
+   actions: {
+     action: "Action",
+@@ -146,6 +221,29 @@
      closeSessions: "Disconnect User",
+     moveUp: "Move up",
+     moveDown: "Move down",
 +    updatePanel: "Update Panel",
 +    updateConfirm: "Update the panel now? It will reinstall and restart.",
 +    updateStarted: "Panel update started",
@@ -2451,9 +2878,9 @@ diff -ruN
 +    empty: "No servers saved yet.",
 +    wipeNodes: "Also delete every inbound on this server (cannot be undone)",
    },
-   login: {
-     title: "Login",
-@@ -234,6 +334,20 @@
+   urlTest: {
+     custom: "Custom test URL",
+@@ -243,6 +341,20 @@
      autoReset: "Auto Reset",
      resetDays: "Reset Days",
      nextReset: "Next Reset",
@@ -2474,7 +2901,7 @@ diff -ruN
    },
    bulk: {
      order: "Order",
-@@ -479,6 +593,13 @@
+@@ -488,6 +600,13 @@
      multiDomain: "Multi Domain",
      remark: "Remark",
      mdOption: "Multi Domain Options",
@@ -2489,24 +2916,15 @@ diff -ruN
    listen: {
      options: "Listen Options",
 diff -ruN
---- a/src/locales/zhcn.ts	2026-09-16 08:54:08.000000000 +0800
-+++ b/src/locales/zhcn.ts	2026-10-21 22:23:16.977815200 +0800
-@@ -42,8 +42,10 @@
-     login: "登录",
-     home: "主页",
-     inbounds: "入站管理",
-+    relay: "中转管理",
-     outbounds: "出站管理",
-     services: "服务管理",
-+    servers: "服务器",
-     endpoints: "节点管理",
-     clients: "用户管理",
-     rules: "路由列表",
-@@ -53,8 +55,82 @@
+--- C:\Users\Administrator\WorkBuddy\2026-10-04-10-51-07\suiwork\x\s-ui-frontend-1.6.5/src/locales/zhcn.ts	2026-10-15 18:53:46.000000000 +0800
++++ b/src/locales/zhcn.ts	2026-10-23 21:48:03.167784700 +0800
+@@ -52,6 +52,78 @@
+     dns: "DNS",
      admins: "管理员",
      settings: "设置",
-   },
-+  // 中转管理：把入口入站的流量经落地节点转发出去
++    relay: "中转管理",
++    servers: "服务器",
++  },
 +  relay: {
 +    btn: "添加中转",
 +    title: "添加中转",
@@ -2564,7 +2982,6 @@ diff -ruN
 +    parseFailLine: "第 {n} 行无法解析,未创建任何东西。",
 +    noPort: "无可用端口",
 +  },
-+  // 导出链接：把客户端的订阅地址 / 分享链接批量导出给外部工具
 +  exportLinks: {
 +    btn: "导出",
 +    title: "导出链接",
@@ -2577,26 +2994,30 @@ diff -ruN
 +    subTab: "订阅",
 +    linksTab: "全部链接",
 +    subDesc: "把订阅链接添加到客户端(v2rayN / 小火箭)一次,它会拉取该客户端的全部协议并自动更新。",
-+  },
+   },
    main: {
      tiles: "信息卡",
+@@ -95,6 +167,8 @@
+       title: "使用量与统计",
+       totalUsage: "总用量",
+     },
 +    tilesAll: "全部",
 +    tilesNone: "清空",
-     gauges: "仪表板",
-     charts: "图表",
-     infos: "信息",
-@@ -105,6 +181,7 @@
-     rule: "规则",
-     ruleset: "规则集",
-     service: "服务",
+   },
+   objects: {
+     inbound: "入站",
+@@ -117,6 +191,7 @@
+     headers: "标头",
+     key: "键",
+     value: "值",
 +    server: "服务器",
-     dnsserver: "DNS 服务器",
-     dnsrule: "DNS规则",
-     user: "用户",
-@@ -144,6 +221,29 @@
-     startCore: "启动内核",
-     restartSb: "重启 Singbox",
+   },
+   actions: {
+     action: "操作",
+@@ -146,6 +221,29 @@
      closeSessions: "断开该用户",
+     moveUp: "上移",
+     moveDown: "下移",
 +    updatePanel: "更新面板",
 +    updateConfirm: "现在更新面板？面板会重新安装并重启。",
 +    updateStarted: "已开始更新面板",
@@ -2621,9 +3042,9 @@ diff -ruN
 +    empty: "还没有保存任何服务器。",
 +    wipeNodes: "同时删除该服务器上的全部入站（不可撤销）",
    },
-   login: {
-     title: "登录",
-@@ -234,6 +334,20 @@
+   urlTest: {
+     custom: "自定义测试 URL",
+@@ -243,6 +341,20 @@
      autoReset: "自动重置",
      resetDays: "重置天数",
      nextReset: "下次重置",
@@ -2644,7 +3065,7 @@ diff -ruN
    },
    bulk: {
      order: "排序",
-@@ -479,6 +593,13 @@
+@@ -488,6 +600,13 @@
      multiDomain: "多域名",
      remark: "备注",
      mdOption: "多域名选项",
@@ -2659,28 +3080,28 @@ diff -ruN
    listen: {
      options: "监听选项",
 diff -ruN
---- a/src/locales/zhtw.ts	2026-09-16 08:54:08.000000000 +0800
-+++ b/src/locales/zhtw.ts	2026-10-21 22:19:35.039807900 +0800
-@@ -44,6 +44,7 @@
-     inbounds: "入站管理",
-     outbounds: "出站管理",
-     services: "服務管理",
+--- C:\Users\Administrator\WorkBuddy\2026-10-04-10-51-07\suiwork\x\s-ui-frontend-1.6.5/src/locales/zhtw.ts	2026-10-15 18:53:46.000000000 +0800
++++ b/src/locales/zhtw.ts	2026-10-23 21:48:03.170777600 +0800
+@@ -52,6 +52,7 @@
+     dns: "DNS",
+     admins: "管理員",
+     settings: "設定",
 +    servers: "伺服器",
-     endpoints: "端點管理",
-     clients: "用戶管理",
-     rules: "路由列表",
-@@ -105,6 +106,7 @@
-     rule: "規則",
-     ruleset: "規則集",
-     service: "服務",
+   },
+   main: {
+     tiles: "資訊卡",
+@@ -117,6 +118,7 @@
+     headers: "標頭",
+     key: "金鑰",
+     value: "值",
 +    server: "伺服器",
-     dnsserver: "DNS 服務器",
-     dnsrule: "DNS 規則",
-     user: "用戶",
-@@ -144,6 +146,29 @@
-     startCore: "啟動核心",
-     restartSb: "重啟 Singbox",
-     closeSessions: "斷開該使用者",
+   },
+   actions: {
+     action: "操作",
+@@ -146,6 +148,29 @@
+     closeSessions: "中斷此用戶連線",
+     moveUp: "上移",
+     moveDown: "下移",
 +    updatePanel: "更新面板",
 +    updateConfirm: "現在更新面板？面板會重新安裝並重啟。",
 +    updateStarted: "已開始更新面板",
@@ -2705,11 +3126,11 @@ diff -ruN
 +    empty: "尚未儲存任何伺服器。",
 +    wipeNodes: "同時刪除該伺服器上的全部入站（無法復原）",
    },
-   login: {
-     title: "登錄",
+   urlTest: {
+     custom: "自訂測試 URL",
 diff -ruN
---- a/src/plugins/api.ts	2026-09-16 08:54:08.000000000 +0800
-+++ b/src/plugins/api.ts	2026-10-21 22:19:35.046788300 +0800
+--- C:\Users\Administrator\WorkBuddy\2026-10-04-10-51-07\suiwork\x\s-ui-frontend-1.6.5/src/plugins/api.ts	2026-10-15 18:53:46.000000000 +0800
++++ b/src/plugins/api.ts	2026-10-23 21:48:03.187730800 +0800
 @@ -1,5 +1,6 @@
  import axios from 'axios'
  import type { CancelTokenSource } from 'axios'
@@ -2736,8 +3157,8 @@ diff -ruN
      },
      (error) => Promise.reject(error),
 diff -ruN
---- a/src/plugins/httputil.ts	2026-09-16 08:54:08.000000000 +0800
-+++ b/src/plugins/httputil.ts	2026-10-21 22:42:57.704075600 +0800
+--- C:\Users\Administrator\WorkBuddy\2026-10-04-10-51-07\suiwork\x\s-ui-frontend-1.6.5/src/plugins/httputil.ts	2026-10-15 18:53:46.000000000 +0800
++++ b/src/plugins/httputil.ts	2026-10-23 21:48:53.925693200 +0800
 @@ -1,4 +1,5 @@
  import api from './api'
 +import axios from 'axios'
@@ -2772,8 +3193,8 @@ diff -ruN
          if (_sessionExpired(err?.response?.status, err?.response?.data?.msg)) {
              push.error({ title: i18n.global.t('invalidLogin') })
 diff -ruN
---- a/src/plugins/remote.ts	1970-01-01 08:00:00.000000000 +0800
-+++ b/src/plugins/remote.ts	2026-10-21 22:19:35.044795700 +0800
+--- C:\Users\Administrator\WorkBuddy\2026-10-04-10-51-07\suiwork\x\s-ui-frontend-1.6.5/src/plugins/remote.ts	1970-01-01 08:00:00.000000000 +0800
++++ b/src/plugins/remote.ts	2026-10-23 21:48:03.189725500 +0800
 @@ -0,0 +1,26 @@
 +// Which panel the UI is currently driving. Empty means "the one that served
 +// this page".
@@ -2802,8 +3223,8 @@ diff -ruN
 +  return current
 +}
 diff -ruN
---- a/src/router/index.ts	2026-09-16 08:54:08.000000000 +0800
-+++ b/src/router/index.ts	2026-10-21 22:19:35.066735600 +0800
+--- C:\Users\Administrator\WorkBuddy\2026-10-04-10-51-07\suiwork\x\s-ui-frontend-1.6.5/src/router/index.ts	2026-10-15 18:53:46.000000000 +0800
++++ b/src/router/index.ts	2026-10-23 21:48:03.191720500 +0800
 @@ -26,6 +26,13 @@
          component: () => import('@/views/Inbounds.vue'),
        },
@@ -2842,8 +3263,8 @@ diff -ruN
      Data().loadData()
    }, 10000)
 diff -ruN
---- a/src/store/modules/data.ts	2026-09-16 08:54:08.000000000 +0800
-+++ b/src/store/modules/data.ts	2026-10-21 22:19:35.072768700 +0800
+--- C:\Users\Administrator\WorkBuddy\2026-10-04-10-51-07\suiwork\x\s-ui-frontend-1.6.5/src/store/modules/data.ts	2026-10-15 18:53:46.000000000 +0800
++++ b/src/store/modules/data.ts	2026-10-23 21:48:03.197704500 +0800
 @@ -9,6 +9,8 @@
  import { Endpoint } from '@/types/endpoints'
  import { Config } from '@/types/config'
@@ -2930,8 +3351,8 @@ diff -ruN
      async loadInbounds(ids: number[]): Promise<Inbound[]> {
        const options = ids.length > 0 ? {id: ids.join(",")} : {}
 diff -ruN
---- a/src/types/servers.ts	1970-01-01 08:00:00.000000000 +0800
-+++ b/src/types/servers.ts	2026-10-21 22:19:35.079750000 +0800
+--- C:\Users\Administrator\WorkBuddy\2026-10-04-10-51-07\suiwork\x\s-ui-frontend-1.6.5/src/types/servers.ts	1970-01-01 08:00:00.000000000 +0800
++++ b/src/types/servers.ts	2026-10-23 21:48:03.226627500 +0800
 @@ -0,0 +1,10 @@
 +// A saved panel address — one row of the launcher, mirroring
 +// database/model/server.go. Two uses share the shape: with an empty token the
@@ -2944,8 +3365,8 @@ diff -ruN
 +  remark?: string
 +}
 diff -ruN
---- a/src/views/Clients.vue	2026-09-16 08:54:08.000000000 +0800
-+++ b/src/views/Clients.vue	2026-10-21 22:19:35.128620200 +0800
+--- C:\Users\Administrator\WorkBuddy\2026-10-04-10-51-07\suiwork\x\s-ui-frontend-1.6.5/src/views/Clients.vue	2026-10-15 18:53:46.000000000 +0800
++++ b/src/views/Clients.vue	2026-10-23 21:48:03.244578600 +0800
 @@ -42,6 +42,49 @@
      :tag="sessions.tag"
      @close="closeSessions"
@@ -3062,7 +3483,7 @@ diff -ruN
  
  const { smAndDown } = useDisplay()
  
-@@ -578,6 +659,73 @@
+@@ -580,6 +661,73 @@
    sessions.value.visible = false
  }
  
@@ -3137,8 +3558,8 @@ diff -ruN
    let filteredClients = clients.value.slice()
    if (filterSettings.value.group != '-') {
 diff -ruN
---- a/src/views/Inbounds.vue	2026-09-16 08:54:08.000000000 +0800
-+++ b/src/views/Inbounds.vue	2026-10-21 22:19:35.137596000 +0800
+--- C:\Users\Administrator\WorkBuddy\2026-10-04-10-51-07\suiwork\x\s-ui-frontend-1.6.5/src/views/Inbounds.vue	2026-10-15 18:53:46.000000000 +0800
++++ b/src/views/Inbounds.vue	2026-10-23 21:48:03.249567500 +0800
 @@ -1,5 +1,18 @@
  <template>
 -  <InboundVue 
@@ -3675,8 +4096,8 @@ diff -ruN
 +]
 +</script>
 diff -ruN
---- a/src/views/Relay.vue	1970-01-01 08:00:00.000000000 +0800
-+++ b/src/views/Relay.vue	2026-10-21 22:19:35.149564500 +0800
+--- C:\Users\Administrator\WorkBuddy\2026-10-04-10-51-07\suiwork\x\s-ui-frontend-1.6.5/src/views/Relay.vue	1970-01-01 08:00:00.000000000 +0800
++++ b/src/views/Relay.vue	2026-10-23 21:48:03.251561800 +0800
 @@ -0,0 +1,422 @@
 +<template>
 +  <!-- ======================================================================
@@ -4101,8 +4522,8 @@ diff -ruN
 +}
 +</script>
 diff -ruN
---- a/src/views/Servers.vue	1970-01-01 08:00:00.000000000 +0800
-+++ b/src/views/Servers.vue	2026-10-21 22:19:35.120642500 +0800
+--- C:\Users\Administrator\WorkBuddy\2026-10-04-10-51-07\suiwork\x\s-ui-frontend-1.6.5/src/views/Servers.vue	1970-01-01 08:00:00.000000000 +0800
++++ b/src/views/Servers.vue	2026-10-23 21:48:03.246574000 +0800
 @@ -0,0 +1,337 @@
 +<template>
 +  <ServerModal
@@ -4442,8 +4863,8 @@ diff -ruN
 +}
 +</script>
 diff -ruN
---- a/src/views/Settings.vue	2026-09-16 08:54:08.000000000 +0800
-+++ b/src/views/Settings.vue	2026-10-21 22:19:35.146570700 +0800
+--- C:\Users\Administrator\WorkBuddy\2026-10-04-10-51-07\suiwork\x\s-ui-frontend-1.6.5/src/views/Settings.vue	2026-10-15 18:53:46.000000000 +0800
++++ b/src/views/Settings.vue	2026-10-23 21:48:03.247570700 +0800
 @@ -46,6 +46,23 @@
              {{ $t('actions.restartApp') }}
            </v-btn>
@@ -4468,7 +4889,7 @@ diff -ruN
          <!-- The core cannot be held down any other way: a plain stop is undone by
             the watchdog within five seconds. -->
          <v-col cols="auto">
-@@ -372,6 +389,17 @@
+@@ -388,6 +405,17 @@
  import Data from '@/store/modules/data'
  const tab = ref("t1")
  const loading:Ref = inject('loading')?? ref(false)
@@ -4486,7 +4907,7 @@ diff -ruN
  const oldSettings = ref<Record<string, string>>({})
  
  const settings = ref({
-@@ -443,6 +471,34 @@
+@@ -460,6 +488,34 @@
  
  const maintenance = computed((): boolean => Data().maintenance)
  

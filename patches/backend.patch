@@ -1,6 +1,6 @@
 diff -ruN
---- a/.github/workflows/docker.yml	2026-09-16 08:54:30.000000000 +0800
-+++ b/.github/workflows/docker.yml	2026-10-21 22:18:56.416553500 +0800
+--- a/.github/workflows/docker.yml	2026-10-15 19:44:34.000000000 +0800
++++ b/.github/workflows/docker.yml	2026-10-23 21:48:03.005218600 +0800
 @@ -1,11 +1,17 @@
  name: Docker Image CI
 +# 仅手动触发。上游是「推 tag 就跑」，但在本仓库里这样跑不通、也不该自动跑：
@@ -24,8 +24,8 @@ diff -ruN
    contents: read
    packages: write
 diff -ruN
---- a/.github/workflows/release.yml	2026-09-16 08:54:30.000000000 +0800
-+++ b/.github/workflows/release.yml	2026-10-21 22:18:56.420515400 +0800
+--- a/.github/workflows/release.yml	2026-10-15 19:44:34.000000000 +0800
++++ b/.github/workflows/release.yml	2026-10-23 21:48:03.004221900 +0800
 @@ -1,14 +1,22 @@
  name: Release S-UI
  
@@ -58,7 +58,7 @@ diff -ruN
    contents: read
 @@ -80,6 +88,19 @@
        - name: Checkout repository
-         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+         uses: actions/checkout@v7
  
 +      # The version the panel reports and compares against GitHub has to come
 +      # from the tag that triggered the build, not from whatever the committed
@@ -74,9 +74,9 @@ diff -ruN
 +          echo "panel repo:    ${{ github.repository }}"
 +
        - name: Download frontend dist
-         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+         uses: actions/download-artifact@v8
          with:
-@@ -203,7 +224,7 @@
+@@ -221,7 +242,7 @@
            if [ "${{ matrix.naive }}" = "true" ]; then PROFILE=release; else PROFILE=test; fi
            TAGS=$(tags_for "$PROFILE")
            LDFLAGS=$(ldflags_for "$PROFILE")
@@ -85,9 +85,9 @@ diff -ruN
            file sui
            ldd sui 2>/dev/null || echo "Static binary confirmed"
  
-@@ -237,6 +258,19 @@
+@@ -255,6 +276,19 @@
        - name: Checkout repository
-         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+         uses: actions/checkout@v7
  
 +      # The version the panel reports and compares against GitHub has to come
 +      # from the tag that triggered the build, not from whatever the committed
@@ -103,9 +103,9 @@ diff -ruN
 +          echo "panel repo:    ${{ github.repository }}"
 +
        - name: Download frontend artifact
-         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+         uses: actions/download-artifact@v8
          with:
-@@ -276,7 +310,7 @@
+@@ -306,7 +340,7 @@
            . ./build-tags.sh
            TAGS=$(tags_for windows)
            LDFLAGS=$(ldflags_for windows)
@@ -115,8 +115,8 @@ diff -ruN
            
            mkdir s-ui-windows
 diff -ruN
---- a/.gitignore	2026-09-16 08:54:30.000000000 +0800
-+++ b/.gitignore	2026-10-21 22:18:55.764387000 +0800
+--- a/.gitignore	2026-10-15 19:44:34.000000000 +0800
++++ b/.gitignore	2026-10-23 21:48:46.612413100 +0800
 @@ -10,6 +10,8 @@
  tmp
  .sync*
@@ -127,9 +127,9 @@ diff -ruN
  
  # local env files
 diff -ruN
---- a/Dockerfile	2026-09-16 08:54:30.000000000 +0800
-+++ b/Dockerfile	2026-10-21 22:18:55.763388600 +0800
-@@ -12,6 +12,8 @@
+--- a/Dockerfile	2026-10-15 19:44:34.000000000 +0800
++++ b/Dockerfile	2026-10-23 21:48:46.610416800 +0800
+@@ -7,6 +7,8 @@
  WORKDIR /app
  ARG TARGETARCH
  ARG TARGETVARIANT
@@ -138,23 +138,25 @@ diff -ruN
  ENV CGO_ENABLED=1
  ENV CGO_CFLAGS="-D_LARGEFILE64_SOURCE"
  ENV GOARCH=$TARGETARCH
-@@ -43,7 +45,7 @@
+@@ -42,7 +44,7 @@
      . ./build-tags.sh && \
      TAGS=$(tags_for docker) && \
      LDFLAGS=$(ldflags_for docker) && \
 -    go build -ldflags="$LDFLAGS" -tags "$TAGS" -o sui main.go
 +    go build -ldflags="$LDFLAGS -X github.com/alireza0/s-ui/config.PanelRepo=${PANEL_REPO}" -tags "$TAGS" -o sui main.go
  
- FROM alpine:3.24.1@sha256:28bd5fe8b56d1bd048e5babf5b10710ebe0bae67db86916198a6eec434943f8b
+ FROM alpine:3
  LABEL org.opencontainers.image.authors="alireza7@gmail.com"
 diff -ruN
 --- a/README-mo.md	1970-01-01 08:00:00.000000000 +0800
-+++ b/README-mo.md	2026-10-21 22:47:50.275915700 +0800
-@@ -0,0 +1,499 @@
-+# S-UI 1.6.3 魔改版
++++ b/README-mo.md	2026-10-23 21:51:39.351495900 +0800
+@@ -0,0 +1,503 @@
++# S-UI 1.6.5 魔改版
 +
-+基于 [alireza0/s-ui](https://github.com/alireza0/s-ui) **v1.6.3**（2026-09-16 发布）的二次开发版本，
-+把 [Teminuosi/s-ui](https://github.com/Teminuosi/s-ui)（基于 v1.4.2）里已验证过的体验改进，重新移植到 1.6.3 上。
++基于 [alireza0/s-ui](https://github.com/alireza0/s-ui) **v1.6.5**（2026-10-15 发布）的二次开发版本。
++
++这个仓库从 1.6.3 起步，1.6.5 那一版的功能（`1.6.3-mo1` → `1.6.3-mo9`）整体平移到新基线上，
++版本串跟着上游走：`1.6.5-mo1` 起的后缀计数从头开始。
 +
 +上游版权归原作者，本项目遵循 GPL-3.0。
 +
@@ -162,18 +164,18 @@ diff -ruN
 +
 +## 1. 和魔改版的关系：为什么没有照搬
 +
-+原魔改版基于 **v1.4.2**，而 1.6.3 中间隔了 1.5.0 → 1.6.3 共十个版本。逐文件比对后，
-+**它 README 里主打的几项功能，上游早已并入，而且实现更好**，所以这次没有搬：
++原魔改版基于 **v1.4.2**，而 1.6.5 中间隔了 1.5.0 → 1.6.5 共十二个版本。逐文件比对后，
++**它 README 里主打的几项功能，上游早已并入，而且实现更好**，所以没有搬：
 +
-+| 魔改版声称的功能 | 1.6.3 现状 | 本次处置 |
++| 魔改版声称的功能 | 1.6.5 现状 | 本次处置 |
 +|---|---|---|
 +| 阶段1：协议模板（一键建 VLESS+Reality 等） | `core/protocol/` 已内置，且比魔改版**多** `snell`、`shadowsocks` | 不搬 |
 +| `core/inbound_users.go` 客户端批量处理 | 已内置 | 不搬 |
 +| Reject SSL handshake for unknown SNI | 已内置，且额外支持**证书热重载**（`certReloader`） | 不搬 |
 +| hashed panel password | 已内置且更完整：`subtle.ConstantTimeCompare` + `BurnPasswordCheck` 防用户名枚举 | 不搬 |
-+| 用 `X-Forwarded-For` 取客户端 IP | 1.6.3 改用 `c.ClientIP()`，走 gin 受信代理白名单，伪造头无效 | 不搬 |
++| 用 `X-Forwarded-For` 取客户端 IP | 1.6.5 改用 `c.ClientIP()`，走 gin 受信代理白名单，伪造头无效 | 不搬 |
 +
-+真正还差、本次移植的是下面五块。
++真正还差、需要自己动手的是下面这些。
 +
 +---
 +
@@ -457,15 +459,17 @@ diff -ruN
 +
 +### 4.3 本次构建与验证记录
 +
-+本次（`1.6.3-mo10`）在 Windows 本机交叉编译，交付物做了公网回读校验：
++本次（`1.6.5-mo2`）在 Windows 本机交叉编译，交付物做了公网回读校验：
 +
 +| 项目 | 结果 |
 +|---|---|
-+| 工具链 | Go 1.26.8 + zig 0.14.1（`zig cc -target x86_64-linux-musl`），`CGO_ENABLED=1` |
++| 工具链 | **Go 1.27.2**（上游 1.6.5 的 `go.mod` 要求，1.6.3 只要求 1.26.7，低版本直接拒绝编译）+ zig 0.14.1（`zig cc -target x86_64-linux-musl`），`CGO_ENABLED=1` |
 +| 链接 | `-linkmode external -extldflags '-static -s'`，产出全静态 ELF |
-+| 前端 | `npm run build` 通过（含 `vue-tsc --noEmit` 类型检查），产物 `e129c7c007d2b222.js`（2 120 757 B）已嵌入 `web/html` |
-+| amd64 | `s-ui-linux-amd64.tar.gz` 35 771 347 B（内含 `sui` 102 457 288 B），ELF 64 位 x86-64 全静态已 strip（节表无 `.symtab`/`.debug_*`，无动态解释器路径） |
-+| 版本 | 包内二进制确认含 `1.6.3-mo10`；本版未在真机跑端到端安装（测试机凭据不可用），公网回读与安装脚本的校验函数实测通过 |
++| 前端 | 依赖升到 **TypeScript 6.0.3** / vuetify 4.2.6 / vite 8.3.4（1.6.3 是 TS 5.9.3 / 4.1.8 / 8.2.1）；`npm run build` 通过（含 `vue-tsc --noEmit` 类型检查，**零错误**），产物 `0c00b643c5521658.js`（2 133 190 B）已嵌入 `web/html` |
++| amd64 | `s-ui-linux-amd64.tar.gz` 35 279 142 B（内含 `sui` 99 948 328 B），ELF 64 位 x86-64 全静态已 strip（节表无 `.symtab`/`.debug_*`，无动态解释器路径） |
++| 版本 | 包内二进制确认含 `1.6.5-mo2`；本版未在真机跑端到端安装（测试机凭据不可用），公网回读与安装脚本的校验函数实测通过 |
++
++比 1.6.3 基线小了约 2.5 MB（`sui` 102 457 288 → 99 948 328 B），来自上游这版自身的变化。
 +
 +早前的 `mo1` / `mo2` 在 Debian 12 / 1 核 / 973 MB 内存 VPS 上用 musl-gcc 构建并做过更完整的功能验证，
 +其中后续版本仍然复用的结论：
@@ -555,7 +559,7 @@ diff -ruN
 +├── api/ cmd/ config/ core/ database/ service/ util/ ...     Go 后端
 +├── frontend/src/          前端源码（含 Relay.vue / RelayWizard.vue / ExportLinks.vue 等改动）
 +├── web/html/              前端构建产物，被 go:embed 打进二进制
-+├── patches/               相对上游 1.6.3 的完整 diff
++├── patches/               相对上游 1.6.5 的完整 diff
 +├── install.sh             一键安装脚本
 +├── build-release.sh       跨平台交叉编译 + 打包
 +└── README-mo.md           本文档
@@ -615,7 +619,7 @@ diff -ruN
 +| `cmd/token.go` / `cmd/cmd.go` | `s-ui token` 子命令 |
 +| `util/shadowsocks.go` | SS-2022 32 字节密钥方法 |
 +| `config/config.go` | `PanelRepo` / `GetPanelRepo` |
-+| `config/version` | `1.6.3-mo10` |
++| `config/version` | `1.6.5-mo2` |
 +
 +前端：
 +
@@ -651,8 +655,8 @@ diff -ruN
 +
 +`patches/backend.patch`、`patches/frontend.patch` 是相对上游的完整 diff，便于逐行审阅。
 diff -ruN
---- a/README.md	2026-09-16 08:54:30.000000000 +0800
-+++ b/README.md	2026-10-21 22:18:55.774322900 +0800
+--- a/README.md	2026-10-15 19:44:34.000000000 +0800
++++ b/README.md	2026-10-23 21:48:46.602436900 +0800
 @@ -1,4 +1,11 @@
 -# S-UI
 +# S-UI面板魔改
@@ -667,8 +671,8 @@ diff -ruN
  
  ![](https://img.shields.io/github/v/release/alireza0/s-ui.svg)
 diff -ruN
---- a/api/apiHandler.go	2026-09-16 08:54:30.000000000 +0800
-+++ b/api/apiHandler.go	2026-10-21 22:18:55.776305700 +0800
+--- a/api/apiHandler.go	2026-10-15 19:44:34.000000000 +0800
++++ b/api/apiHandler.go	2026-10-23 21:48:02.848639500 +0800
 @@ -27,6 +27,9 @@
  			checkLogin(c)
  		}
@@ -716,8 +720,8 @@ diff -ruN
  		jsonMsg(c, "failed", common.NewError("unknown action: ", action))
  	}
 diff -ruN
---- a/api/apiService.go	2026-09-16 08:54:30.000000000 +0800
-+++ b/api/apiService.go	2026-10-21 22:18:55.778324300 +0800
+--- a/api/apiService.go	2026-10-15 19:44:34.000000000 +0800
++++ b/api/apiService.go	2026-10-23 21:48:02.845647900 +0800
 @@ -28,6 +28,7 @@
  	service.PanelService
  	service.StatsService
@@ -766,7 +770,7 @@ diff -ruN
  	tag := c.Query("tag")
 diff -ruN
 --- a/api/remote.go	1970-01-01 08:00:00.000000000 +0800
-+++ b/api/remote.go	2026-10-21 22:18:55.798204900 +0800
++++ b/api/remote.go	2026-10-23 21:48:02.842654500 +0800
 @@ -0,0 +1,258 @@
 +package api
 +
@@ -1028,7 +1032,7 @@ diff -ruN
 +}
 diff -ruN
 --- a/build-release.sh	1970-01-01 08:00:00.000000000 +0800
-+++ b/build-release.sh	2026-10-21 22:19:35.235353400 +0800
++++ b/build-release.sh	2026-10-23 21:48:46.603435100 +0800
 @@ -0,0 +1,168 @@
 +#!/bin/sh
 +# Cross-compile the Linux release archives.
@@ -1199,8 +1203,8 @@ diff -ruN
 +[ -n "$built" ] && ( cd "$OUT" && cat SHA256SUMS )
 +exit 0
 diff -ruN
---- a/cmd/cmd.go	2026-09-16 08:54:30.000000000 +0800
-+++ b/cmd/cmd.go	2026-10-21 22:18:55.820146900 +0800
+--- a/cmd/cmd.go	2026-10-15 19:44:34.000000000 +0800
++++ b/cmd/cmd.go	2026-10-23 21:48:02.797774500 +0800
 @@ -17,6 +17,7 @@
  	adminCmd := flag.NewFlagSet("admin", flag.ExitOnError)
  	settingCmd := flag.NewFlagSet("setting", flag.ExitOnError)
@@ -1254,7 +1258,7 @@ diff -ruN
  		if err != nil {
 diff -ruN
 --- a/cmd/token.go	1970-01-01 08:00:00.000000000 +0800
-+++ b/cmd/token.go	2026-10-21 22:18:55.878580000 +0800
++++ b/cmd/token.go	2026-10-23 21:48:02.798771100 +0800
 @@ -0,0 +1,43 @@
 +package cmd
 +
@@ -1300,8 +1304,8 @@ diff -ruN
 +	fmt.Println(token)
 +}
 diff -ruN
---- a/config/config.go	2026-09-16 08:54:30.000000000 +0800
-+++ b/config/config.go	2026-10-21 22:18:55.883566800 +0800
+--- a/config/config.go	2026-10-15 19:44:34.000000000 +0800
++++ b/config/config.go	2026-10-23 21:48:02.858611300 +0800
 @@ -28,6 +28,46 @@
  	return strings.TrimSpace(version)
  }
@@ -1350,16 +1354,16 @@ diff -ruN
  	return strings.TrimSpace(name)
  }
 diff -ruN
---- a/config/version	2026-09-16 08:54:30.000000000 +0800
-+++ b/config/version	2026-10-21 22:43:32.773850900 +0800
+--- a/config/version	2026-10-15 19:44:34.000000000 +0800
++++ b/config/version	2026-10-23 21:48:54.012983700 +0800
 @@ -1 +1 @@
--1.6.3
+-1.6.5
 \ No newline at end of file
-+1.6.3-mo10
++1.6.5-mo2
 \ No newline at end of file
 diff -ruN
 --- a/database/model/server.go	1970-01-01 08:00:00.000000000 +0800
-+++ b/database/model/server.go	2026-10-21 22:18:56.126984300 +0800
++++ b/database/model/server.go	2026-10-23 21:48:02.813731800 +0800
 @@ -0,0 +1,21 @@
 +package model
 +
@@ -1383,8 +1387,8 @@ diff -ruN
 +	Remark string `json:"remark" form:"remark"`
 +}
 diff -ruN
---- a/database/schema.go	2026-09-16 08:54:30.000000000 +0800
-+++ b/database/schema.go	2026-10-21 22:18:56.149922200 +0800
+--- a/database/schema.go	2026-10-15 19:44:34.000000000 +0800
++++ b/database/schema.go	2026-10-23 21:48:02.815727300 +0800
 @@ -31,6 +31,7 @@
  		{"stats", &model.Stats{}, copyRows[model.Stats]},
  		{"clients", &model.Client{}, copyRows[model.Client]},
@@ -1394,8 +1398,8 @@ diff -ruN
  }
  
 diff -ruN
---- a/install.sh	2026-09-16 08:54:30.000000000 +0800
-+++ b/install.sh	2026-10-21 22:18:55.759400300 +0800
+--- a/install.sh	2026-10-15 19:44:34.000000000 +0800
++++ b/install.sh	2026-10-23 21:48:46.608420900 +0800
 @@ -8,6 +8,65 @@
  cur_dir=$(pwd)
  
@@ -1603,7 +1607,7 @@ diff -ruN
  prepare_services() {
      if [[ "${init_system}" == "systemd" ]]; then
          if [[ -f "/etc/systemd/system/sing-box.service" ]]; then
-@@ -486,14 +665,32 @@
+@@ -496,14 +675,32 @@
          return 0
      fi
  
@@ -1643,7 +1647,7 @@ diff -ruN
      fi
  
      actual=$(sha256sum "$archive" | awk '{ print $1 }')
-@@ -516,7 +713,7 @@
+@@ -526,7 +723,7 @@
      local sums="$workdir/SHA256SUMS"
  
      if [ $# == 0 ]; then
@@ -1652,16 +1656,16 @@ diff -ruN
          if [[ ! -n "$last_version" ]]; then
              echo -e "${red}$(t fetch_fail)${plain}"
              exit 1
-@@ -530,7 +727,7 @@
+@@ -540,7 +737,7 @@
      # No --no-check-certificate. It was on every download here, which turns the
      # whole install into an unauthenticated fetch: anyone able to intercept it
      # chooses the binary that then runs as root.
 -    local base="https://github.com/alireza0/s-ui/releases/download/${last_version}"
 +    local base="https://github.com/${SUI_REPO}/releases/download/${last_version}"
-     if ! wget -q --show-progress -O "$archive" "${base}/s-ui-linux-$(arch).tar.gz"; then
+     if ! fetch "${base}/s-ui-linux-$(arch).tar.gz" "$archive"; then
          if [ $# == 0 ]; then
              echo -e "${red}$(t download_fail)${plain}"
-@@ -587,7 +784,10 @@
+@@ -597,7 +794,10 @@
          systemctl enable s-ui --now
      fi
  
@@ -1673,7 +1677,7 @@ diff -ruN
      echo -e "$(t access_panel)${green}"
      /usr/local/s-ui/sui uri
      echo -e "${plain}"
-@@ -595,6 +795,23 @@
+@@ -605,6 +805,23 @@
      s-ui help
  }
  
@@ -1698,8 +1702,8 @@ diff -ruN
  install_base
  install_s-ui $1
 diff -ruN
---- a/s-ui.sh	2026-09-16 08:54:30.000000000 +0800
-+++ b/s-ui.sh	2026-10-21 22:18:55.761394100 +0800
+--- a/s-ui.sh	2026-10-15 19:44:34.000000000 +0800
++++ b/s-ui.sh	2026-10-23 21:48:46.613407800 +0800
 @@ -17,6 +17,27 @@
      echo -e "${green}[INF] $* ${plain}"
  }
@@ -1901,8 +1905,8 @@ diff -ruN
      *) show_usage ;;
      esac
 diff -ruN
---- a/service/config.go	2026-09-16 08:54:30.000000000 +0800
-+++ b/service/config.go	2026-10-21 22:18:56.198861700 +0800
+--- a/service/config.go	2026-10-15 19:44:34.000000000 +0800
++++ b/service/config.go	2026-10-23 21:48:02.757880800 +0800
 @@ -35,6 +35,7 @@
  	OutboundService
  	ServicesService
@@ -1924,8 +1928,8 @@ diff -ruN
  		err = s.SettingService.SaveConfig(tx, data)
  		if err != nil {
 diff -ruN
---- a/service/panel.go	2026-09-16 08:54:30.000000000 +0800
-+++ b/service/panel.go	2026-10-21 22:18:56.230568100 +0800
+--- a/service/panel.go	2026-10-15 19:44:34.000000000 +0800
++++ b/service/panel.go	2026-10-23 21:48:02.760873200 +0800
 @@ -1,11 +1,19 @@
  package service
  
@@ -2192,7 +2196,7 @@ diff -ruN
 +}
 diff -ruN
 --- a/service/serverlist.go	1970-01-01 08:00:00.000000000 +0800
-+++ b/service/serverlist.go	2026-10-21 22:18:56.188887700 +0800
++++ b/service/serverlist.go	2026-10-23 21:48:02.758878200 +0800
 @@ -0,0 +1,58 @@
 +package service
 +
@@ -2253,8 +2257,8 @@ diff -ruN
 +	}
 +}
 diff -ruN
---- a/service/user.go	2026-09-16 08:54:30.000000000 +0800
-+++ b/service/user.go	2026-10-21 22:18:56.254459700 +0800
+--- a/service/user.go	2026-10-15 19:44:34.000000000 +0800
++++ b/service/user.go	2026-10-23 21:48:02.756884800 +0800
 @@ -217,6 +217,27 @@
  // DeleteToken removes one of the caller's own API tokens. The owner check is
  // the point: the id came from the form with no constraint, so any logged-in
@@ -2285,7 +2289,7 @@ diff -ruN
  		return common.NewError("not logged in")
 diff -ruN
 --- a/setrepo.sh	1970-01-01 08:00:00.000000000 +0800
-+++ b/setrepo.sh	2026-10-21 22:18:55.749842900 +0800
++++ b/setrepo.sh	2026-10-23 21:48:46.604431600 +0800
 @@ -0,0 +1,43 @@
 +#!/bin/bash
 +# Point this checkout at the repository that will publish it.
@@ -2331,8 +2335,8 @@ diff -ruN
 +*) echo "note: install.sh and the updater assume the default branch is 'main' and the script is at its root." ;;
 +esac
 diff -ruN
---- a/util/shadowsocks.go	2026-09-16 08:54:30.000000000 +0800
-+++ b/util/shadowsocks.go	2026-10-21 22:18:56.296478500 +0800
+--- a/util/shadowsocks.go	2026-10-15 19:44:34.000000000 +0800
++++ b/util/shadowsocks.go	2026-10-23 21:48:02.646459300 +0800
 @@ -4,6 +4,8 @@
  	switch method {
  	case "2022-blake3-aes-128-gcm":

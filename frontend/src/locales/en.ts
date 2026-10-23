@@ -42,10 +42,8 @@ export default {
     login: "Login",
     home: "Home",
     inbounds: "Inbounds",
-    relay: "Relay",
     outbounds: "Outbounds",
     services: "Services",
-    servers: "Servers",
     endpoints: "Endpoints",
     clients: "Clients",
     rules: "Rules",
@@ -54,8 +52,9 @@ export default {
     dns: "DNS",
     admins: "Admins",
     settings: "Settings",
+    relay: "Relay",
+    servers: "Servers",
   },
-  // Relay management: forward an inbound's traffic out through a landing node
   relay: {
     btn: "Add Relay",
     title: "Add Relay (Transit)",
@@ -113,7 +112,6 @@ export default {
     parseFailLine: "Line {n} could not be parsed — nothing was created.",
     noPort: "no free port",
   },
-  // Export links: bulk-export client subscriptions / share links
   exportLinks: {
     btn: "Export",
     title: "Export Links",
@@ -129,8 +127,6 @@ export default {
   },
   main: {
     tiles: "Tiles",
-    tilesAll: "All",
-    tilesNone: "None",
     gauges: "Gauges",
     charts: "Charts",
     infos: "Information",
@@ -171,6 +167,8 @@ export default {
       title: "Usage & Counts",
       totalUsage: "Total Usage",
     },
+    tilesAll: "All",
+    tilesNone: "None",
   },
   objects: {
     inbound: "Inbound",
@@ -181,7 +179,6 @@ export default {
     rule: "Rule",
     ruleset: "Ruleset",
     service: "Service",
-    server: "Server",
     dnsserver: "DNS Server",
     dnsrule: "DNS Rule",
     user: "User",
@@ -194,6 +191,7 @@ export default {
     headers: "Headers",
     key: "Key",
     value: "Value",
+    server: "Server",
   },
   actions: {
     action: "Action",
@@ -221,6 +219,8 @@ export default {
     startCore: "Start Core",
     restartSb: "Restart Singbox",
     closeSessions: "Disconnect User",
+    moveUp: "Move up",
+    moveDown: "Move down",
     updatePanel: "Update Panel",
     updateConfirm: "Update the panel now? It will reinstall and restart.",
     updateStarted: "Panel update started",
@@ -244,6 +244,11 @@ export default {
     backToLocal: "Back to this panel",
     empty: "No servers saved yet.",
     wipeNodes: "Also delete every inbound on this server (cannot be undone)",
+  },
+  urlTest: {
+    custom: "Custom test URL",
+    url: "Test URL",
+    invalid: "Must be an http(s) URL",
   },
   login: {
     title: "Login",
@@ -300,6 +305,8 @@ export default {
     path: "Default Path",
     update: "Automatic Update Time",
     subUri: "Subscription URI",
+    subCustomHeaders: "Custom HTTP Headers",
+    subCustomHeadersHint: "Extra headers sent with every subscription, one \"Name: value\" per line; lines starting with # are ignored",
     jsonSub: "JSON Subscription",
     toProxy: "Route to Proxy",
     defaultRules: "Default Rules",
