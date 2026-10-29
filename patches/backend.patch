@@ -149,8 +149,8 @@ diff -ruN
  LABEL org.opencontainers.image.authors="alireza7@gmail.com"
 diff -ruN
 --- a/README-mo.md	1970-01-01 08:00:00.000000000 +0800
-+++ b/README-mo.md	2026-10-23 21:51:39.351495900 +0800
-@@ -0,0 +1,503 @@
++++ b/README-mo.md	2026-10-29 13:51:58.875084500 +0800
+@@ -0,0 +1,554 @@
 +# S-UI 1.6.5 魔改版
 +
 +基于 [alireza0/s-ui](https://github.com/alireza0/s-ui) **v1.6.5**（2026-10-15 发布）的二次开发版本。
@@ -377,6 +377,51 @@ diff -ruN
 +   只有本次请求的那些段；`sys` 只请求一次，于是下一轮就把 `sys` 抹掉，再下一轮
 +   发现没有又去请求，来回抖。改成合并 `{ ...tilesData.value, ...data.obj }`。
 +
++### 2.10 中转批量导入 socks5 住宅 IP，一键搭 Hysteria2 入口
++
++向导的「自动建站」原来只出一种入口：`vless + reality`。做住宅 IP 中转时这个组合不好用 ——
++住宅代理方给的是**一堆 socks5 账号**，而 reality 只能伪装成某个 TLS 站点，
++配一堆节点要手工挑端口、写 SNI、生成密钥。这一版加了协议切换：
++
++**入口协议二选一**：`VLESS + Reality`（原有）/ `Hysteria2 + 住宅 IP`（新增）。
++选 hy2 后，粘贴框从「落地链接」变成「住宅 socks5 列表」，每行一条，**一个节点 = 一个 hy2 入口**。
++
++- **socks5 收四种写法**（末尾都可带 `#备注`，备注会当成节点名）：
++  `socks5://user:pass@host:port` · `user:pass@host:port` · `host:port:user:pass` · `host:port`。
++  端口校验、IPv6 方括号、用户名密码 URL 解码都做了；密码里带冒号也不会被切断
++  （`host:port:user:pass` 这类裸写法里，第三个冒号之后的整段都算密码）。
++- **逐行解析预览**：粘贴后立刻在下方列出每一行解析出来的 `host:port / 账号`，
++  写错的行**当场标红**，不等到建到第 8 条才发现第 9 行拼错。点创建时仍然先全量解析一遍，
++  任何一行不合格就一条都不建。
++- **每行生成一整套**：`1 个 hy2 入站 + N 个用户 + 1 个 socks 出站 + N 条 auth_user 路由规则`
++  （N 是「每节点用户数」）。端口从 10000-60000 里挑没被占用的，tag 是 `备注-in` / `备注-out`。
++- **hy2 多出来的三个字段**：
++  - **节点地址**（可选）：写进入站的 `addrs`，客户端链接里就用它；留空则由后端回退到
++    请求的 `Host`（面板域名），所以从内网 IP 打开面板时最好填上公网域名。
++  - **SNI / 证书域名**：同时进证书的 CN/SAN 和服务端 `server_name`，决定链接里的 `sni`。
++  - **salamander 混淆**（可选）：勾上后**每个入站一把随机密码**，链接里自动带
++    `obfs=salamander&obfs-password=…`，一个节点泄露不影响其它节点。
++- **TLS 自动就绪**：hy2 必须跑 TLS，没有「裸协议」这个选项。选了「复用已有证书」就用那份，
++  否则现场调 `api/keypairs?k=tls&o=<SNI>` 签一张自签证书。服务端与客户端**两侧都显式写
++  `alpn=h3`**，不依赖 sing-box 的默认值（QUIC 只跑 h3，写死免得日后默认值变化）。
++  自签那份的客户端配置带 `insecure: true`，后端 `util/genLink.go` 会据此在链接里写
++  `insecure=1`，否则客户端拿自签证书去校链必然失败。
++- **用户凭据写在 `config.hysteria2`**：hy2 认的是 `password` 而不是 uuid，所以建用户时
++  `config.hysteria2 = { name, password }` 一起写进去 —— 后端按这个字段生成入站的 `users` 列表，
++  `name` 同时是 sing-box 侧的会话/统计标识，缺了它流量统计会是空白。
++- **用户改走 `clients/addbulk`**：同一个节点的 N 个用户一次保存。每存一次客户端都会重启核心，
++  批量导几十个节点时这一下能省掉大半重启（配置仍然只写一次：N 个节点也只重启一次）。
++- **建完直接摊链接**：向导向上抛 `created` 事件，中转页关掉向导并打开新的**节点链接弹窗**
++  （`layouts/modals/RelayLinks.vue`）：按用户分组列出 `hysteria2://…`，每条可单条复制、
++  展开二维码，也能明文或 Base64 整包复制。链接**由后端 `util/genLink.go` 生成**，不是前端拼的，
++  参数与「导出链接」弹窗、订阅输出完全一致。中转页每张卡片也多了个「节点链接」按钮随时再看。
++- **只收 socks5**：hy2 模式下不再走后端 `linkConvert` 兜底 —— 把一条 vless 链接
++  悄悄做成 socks 落地，比直接报错更难查。
++
++部署要点：hy2 跑在 **UDP/QUIC** 上，防火墙与安全组要放行入口端口的 **UDP**（只放 TCP 会连不上，
++且症状是「TCP 端口通、客户端一直握手超时」）。自签证书的链接带 `insecure=1`；
++如果节点地址填的是真实域名、证书也用真证书（选「复用已有证书」），客户端可以不开 insecure。
++
 +## 3. 相对原魔改版实现上的改进
 +
 +
@@ -459,17 +504,22 @@ diff -ruN
 +
 +### 4.3 本次构建与验证记录
 +
-+本次（`1.6.5-mo2`）在 Windows 本机交叉编译，交付物做了公网回读校验：
++本次（`1.6.5-mo3`）在 Windows 本机交叉编译，前端与后端一起重出：
 +
 +| 项目 | 结果 |
 +|---|---|
 +| 工具链 | **Go 1.27.2**（上游 1.6.5 的 `go.mod` 要求，1.6.3 只要求 1.26.7，低版本直接拒绝编译）+ zig 0.14.1（`zig cc -target x86_64-linux-musl`），`CGO_ENABLED=1` |
 +| 链接 | `-linkmode external -extldflags '-static -s'`，产出全静态 ELF |
-+| 前端 | 依赖升到 **TypeScript 6.0.3** / vuetify 4.2.6 / vite 8.3.4（1.6.3 是 TS 5.9.3 / 4.1.8 / 8.2.1）；`npm run build` 通过（含 `vue-tsc --noEmit` 类型检查，**零错误**），产物 `0c00b643c5521658.js`（2 133 190 B）已嵌入 `web/html` |
-+| amd64 | `s-ui-linux-amd64.tar.gz` 35 279 142 B（内含 `sui` 99 948 328 B），ELF 64 位 x86-64 全静态已 strip（节表无 `.symtab`/`.debug_*`，无动态解释器路径） |
-+| 版本 | 包内二进制确认含 `1.6.5-mo2`；本版未在真机跑端到端安装（测试机凭据不可用），公网回读与安装脚本的校验函数实测通过 |
++| 前端 | TypeScript 6.0.3 / vuetify 4.2.6 / vite 8.3.4；`npm run build`（含 `vue-tsc --noEmit` 类型检查）**零错误**，产物 `0fb5485978ce7a77.js`（2 149 124 B）+ `6ca70179c1947e91.css`（772 141 B）已嵌入 `web/html` |
++| 单测 | `npm run test` **131 passed**（5 个文件） |
++| amd64 | `s-ui-linux-amd64.tar.gz` 35 285 380 B（内含 `sui` 99 964 264 B），sha256 `bf09baea…add739b2`，ELF 64 位 x86-64 全静态已 strip（无 `.symtab` / `.debug_*`，无动态解释器路径，`libc.so` 无引用） |
++| 版本 | 包内二进制确认含 `1.6.5-mo3`；本版**未在真机跑端到端安装**，hy2 链条（自签证书 → 入站 users → `hysteria2://` 链接）只做到前端解析与接口调用层面的核对 |
 +
-+比 1.6.3 基线小了约 2.5 MB（`sui` 102 457 288 → 99 948 328 B），来自上游这版自身的变化。
++相对 `1.6.5-mo2`，前端 bundle 大了 15 934 B（2 133 190 → 2 149 124 B），
++二进制同步大了 15 936 B（99 948 328 → 99 964 264 B），差值全部来自新增的
++中转 hy2 向导与节点链接弹窗，后端代码未改动。
++
++比 1.6.3 基线小了约 2.5 MB（`sui` 102 457 288 → 99 948 328 B），来自上游 1.6.5 自身的变化。
 +
 +早前的 `mo1` / `mo2` 在 Debian 12 / 1 核 / 973 MB 内存 VPS 上用 musl-gcc 构建并做过更完整的功能验证，
 +其中后续版本仍然复用的结论：
@@ -619,7 +669,7 @@ diff -ruN
 +| `cmd/token.go` / `cmd/cmd.go` | `s-ui token` 子命令 |
 +| `util/shadowsocks.go` | SS-2022 32 字节密钥方法 |
 +| `config/config.go` | `PanelRepo` / `GetPanelRepo` |
-+| `config/version` | `1.6.5-mo2` |
++| `config/version` | `1.6.5-mo3` |
 +
 +前端：
 +
@@ -629,7 +679,8 @@ diff -ruN
 +| `src/layouts/modals/Client.vue` | 新增 `presetInbounds`：从别处新增用户时预勾入站 |
 +| `src/layouts/modals/ExportLinks.vue` | 新增：导出订阅 URL / 分享链接弹窗 |
 +| `src/layouts/modals/RelayUsers.vue` | 新增：中转用户管理（列表 / 增删改 / 启用 / 二维码） |
-+| `src/layouts/modals/RelayWizard.vue` | 新增：添加中转向导。两种模式：接入已有入站 / 批量自动建站（每行链接生成入站+用户+出站+规则） |
++| `src/layouts/modals/RelayLinks.vue` | 新增：中转节点链接弹窗（按用户列出 hy2 等链接 / 复制 / 二维码 / Base64） |
++| `src/layouts/modals/RelayWizard.vue` | 新增：添加中转向导。两种模式：接入已有入站 / 批量自动建站（每行链接生成入站+用户+出站+规则）；自动建站支持 `vless+reality` 与 `hysteria2+住宅IP` 两种入口协议 |
 +| `src/layouts/modals/Server.vue` | 新增：服务器增改弹窗 |
 +| `src/locales/{en,zhcn,zhtw}.ts` | 新增文案（三份的覆盖范围见 §8） |
 +| `src/plugins/api.ts` | 每个请求注入 `X-Remote-Server` |
@@ -637,7 +688,7 @@ diff -ruN
 +| `src/router/index.ts` | `/servers`、`/relay` 路由；启动时拉一次列表 |
 +| `src/store/modules/data.ts` | servers / currentServer / loadServers / switchServer |
 +| `src/types/servers.ts` | 新增：Server 类型 |
-+| `src/views/Relay.vue` | 新增：中转管理页 |
++| `src/views/Relay.vue` | 新增：中转管理页（每张卡片带测速 / 用户管理 / 节点链接） |
 +| `src/views/Servers.vue` | 新增：服务器列表页 |
 +| `src/views/Settings.vue` | 版本检查 + 一键升级按钮 |
 +
@@ -1355,11 +1406,11 @@ diff -ruN
  }
 diff -ruN
 --- a/config/version	2026-10-15 19:44:34.000000000 +0800
-+++ b/config/version	2026-10-23 21:48:54.012983700 +0800
++++ b/config/version	2026-10-29 13:48:23.181624700 +0800
 @@ -1 +1 @@
 -1.6.5
 \ No newline at end of file
-+1.6.5-mo2
++1.6.5-mo3
 \ No newline at end of file
 diff -ruN
 --- a/database/model/server.go	1970-01-01 08:00:00.000000000 +0800

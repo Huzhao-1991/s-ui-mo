@@ -31,6 +31,15 @@
     v-model="wizardModal"
     :visible="wizardModal"
     @close="wizardModal = false"
+    @created="onWizardCreated"
+  />
+  <!-- 节点链接：向导建完站自动弹一次，之后也能从中转卡片上随时打开。
+       链接由后端按入口入站 + 客户端生成（hy2 的 tls/sni/obfs 参数都在里面） -->
+  <RelayLinks
+    :visible="links.visible"
+    :inbound-tags="links.tags"
+    :title="links.title"
+    @close="links.visible = false"
   />
   <!-- 中转的用户 = 入口入站上的客户端 + 路由规则里的 auth_user 名单。
        用户弹窗见 RelayUsers.vue；「转为按用户」在弹窗里发起、由本页统一执行 -->
@@ -186,6 +195,11 @@
             <v-icon />
             <v-tooltip activator="parent" location="top" :text="$t('client.links')" />
           </v-btn>
+          <!-- 节点链接：该中转全部入口入站的分享链接，按用户列出，可整包复制 -->
+          <v-btn icon="mdi-link-variant" @click="openLinks(r)">
+            <v-icon />
+            <v-tooltip activator="parent" location="top" :text="$t('relay.nodeLinks')" />
+          </v-btn>
           <!-- 删除：点图标后弹出二次确认覆盖层 -->
           <v-btn icon="mdi-file-remove" color="warning" @click="delOverlay[index] = true">
             <v-icon />
@@ -216,6 +230,7 @@ import Data from '@/store/modules/data'
 import HttpUtils from '@/plugins/httputil'
 import RelayWizard from '@/layouts/modals/RelayWizard.vue'
 import RelayUsers from '@/layouts/modals/RelayUsers.vue'
+import RelayLinks from '@/layouts/modals/RelayLinks.vue'
 import QrCode from '@/layouts/modals/QrCode.vue'
 import ExportLinks from '@/layouts/modals/ExportLinks.vue'
 import { i18n } from '@/locales'
@@ -229,6 +244,26 @@ const delLoading = ref(false)
 const clearConfirm = ref(false)  // 「全部删除」确认框
 const clearLoading = ref(false)
 const checkResults = ref<Record<string, any>>({}) // 落地测速结果，按出站 tag 索引
+
+// 节点链接弹窗（RelayLinks.vue）：tags 是入口入站 tag 列表
+const links = ref({ visible: false, tags: <string[]>[], title: '' })
+
+// 卡片上的「节点链接」：把该中转的全部入口入站交过去，
+// 弹窗再按 tag 反查客户端、取后端生成的链接
+const openLinks = (r: any) => {
+  links.value.tags = [...r.inbounds]
+  links.value.title = r.outbound
+  links.value.visible = true
+}
+
+// 向导建完站（自动建站）会带来新建的入口入站 tag：直接弹节点链接，
+// 省得再回卡片上点一次。弹窗一开就把向导关掉，避免两层 dialog 叠着。
+const onWizardCreated = (p: any) => {
+  wizardModal.value = false
+  links.value.tags = <string[]>(p?.tags || [])
+  links.value.title = p?.title || ''
+  links.value.visible = true
+}
 
 // 用户管理弹窗（RelayUsers.vue）：按中转逐个打开
 const users = ref({ visible: false, name: '', entryTags: <string[]>[] })

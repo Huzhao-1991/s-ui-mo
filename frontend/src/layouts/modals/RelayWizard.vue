@@ -16,19 +16,29 @@
 
     B. 自动建站（provision）
        一次粘贴多行落地链接，每行一条，逐条生成一整套：
-         入站（vless + reality，端口自动挑不冲突的）
-         用户（自动生成 uuid，绑到该入站上）
-         出站（解析出来的落地 socks 节点）
+         入站（协议见下）、用户（随机凭据）、出站（该行的 socks5 落地）、
          规则 {inbound:[新入站], auth_user:[新用户], action:'route', outbound:新出站}
        N 行链接 = N 个入站 + N×每节点用户数 个用户 + N 个出站 + N×用户数 条规则。
-       入站/用户/出站/规则四项一次性配齐，不用再回「入站管理」「用户管理」页补。
+
+       入口协议（form.protocol）两种：
+         vless    —— VLESS + Reality，客户端从公网连进来这一段值得真加密（旧行为）
+         hysteria2 —— Hysteria2（QUIC/UDP）+ TLS，落地仍是 socks5 住宅 IP。
+                      这是「住宅 IP 中转」的常见形态：客户端用 hy2 连本机，
+                      本机再把流量交给住宅代理出去。
+                      TLS 可以复用一份带服务端证书的配置，或现场自签一份
+                      （自签时客户端侧带 insecure，链接里会自动出现 insecure=1）。
+                      节点地址留空则用当前访问面板的域名/IP 拼链接，
+                      填了就写进入站的 addrs（链接里就用这个主机名）。
 
     两种模式都只在最后保存一次 config —— 后端只有 config 这一个 object 会
     重启核心，把规则攒到最后一起写，N 个节点也只重启一次。
 
+    建完之后把新建的入口入站 tag 通过 created 事件交给中转页，
+    由它打开「节点链接」弹窗（RelayLinks.vue）把 hy2 链接直接摊出来。
+
     后端无需任何新接口，全部复用：
       - api/save       object=inbounds / clients / outbounds / tls / config
-      - api/keypairs   ?k=reality（生成 reality 密钥对）
+      - api/keypairs   ?k=reality（Reality 密钥对）/ ?k=tls（自签证书）
       - api/linkConvert（分享链接 -> 出站对象）
       - api/checkOutbound ?tag=（对落地出站做一次连通性测速）
     ====================================================================== -->
@@ -53,11 +63,30 @@
           </v-btn-toggle>
 
           <v-row>
+            <!-- 入口协议：只影响「自动建站」。attach 模式不动已有入站，没有这一项 -->
+            <v-col cols="12" v-if="mode == 'provision'">
+              <v-btn-toggle
+                v-model="form.protocol"
+                mandatory
+                divided
+                density="compact"
+                variant="outlined"
+                color="primary"
+              >
+                <v-btn value="vless" size="small">{{ $t('relay.protoVless') }}</v-btn>
+                <v-btn value="hysteria2" size="small">{{ $t('relay.protoHy2') }}</v-btn>
+              </v-btn-toggle>
+              <p style="font-size: 0.78rem; opacity: 0.75; margin-top: 6px;">
+                {{ isHy2 ? $t('relay.protoHintHy2') : $t('relay.protoHintVless') }}
+              </p>
+            </v-col>
+
             <v-col cols="12">
-              <!-- 落地节点分享链接。attach 模式只用一行；provision 模式每行一条 -->
+              <!-- 落地节点分享链接。attach 模式只用一行；provision 模式每行一条。
+                   hy2 模式下这里是「住宅 socks5 列表」，只收 socks5 写法。 -->
               <v-textarea
-                :label="mode == 'provision' ? $t('relay.bulkLinks') : $t('relay.link')"
-                :hint="mode == 'provision' ? $t('relay.bulkLinksHint') : $t('relay.linkHint')"
+                :label="linkLabel"
+                :hint="linkHint"
                 persistent-hint
                 v-model="form.link"
                 :rows="mode == 'provision' ? 5 : 2"
@@ -66,6 +95,28 @@
               <p v-if="mode == 'provision' && links.length > 0" style="font-size: 0.8rem; opacity: 0.75; margin-top: 6px;">
                 {{ $t('relay.bulkCount', { n: links.length }) }}
               </p>
+              <!-- 逐行解析预览：hy2 模式只收 socks5，写错的行当场标红，
+                   不用等建到一半才发现。 -->
+              <v-card
+                v-if="mode == 'provision' && isHy2 && links.length > 0"
+                variant="outlined"
+                class="rounded-lg"
+                style="margin-top: 8px; max-height: 170px; overflow: auto;"
+              >
+                <v-list density="compact">
+                  <v-list-item v-for="p in bulkPreview" :key="p.index">
+                    <template #prepend>
+                      <v-icon
+                        :color="p.ok ? 'success' : 'error'"
+                        :icon="p.ok ? 'mdi-check-circle' : 'mdi-alert-circle'"
+                        size="small"
+                      />
+                    </template>
+                    <v-list-item-title style="font-size: 0.8rem; font-family: monospace;">{{ p.index }}. {{ p.text }}</v-list-item-title>
+                    <v-list-item-subtitle style="font-size: 0.72rem;">{{ p.detail }}</v-list-item-subtitle>
+                  </v-list-item>
+                </v-list>
+              </v-card>
             </v-col>
 
             <!-- ---------------- attach：接入已有入站 ---------------- -->
@@ -132,26 +183,74 @@
                   v-model.number="form.perNode"
                 />
               </v-col>
-              <v-col cols="12" sm="7">
-                <!-- Reality 伪装域名：握手转发到哪。必须是本机可达的 TLS 站点 -->
-                <v-text-field
-                  :label="$t('relay.dest')"
-                  :hint="$t('relay.destHint')"
-                  persistent-hint
-                  v-model="form.dest"
-                />
-              </v-col>
-              <v-col cols="12" sm="5">
-                <!-- 复用一份已有的 reality 配置，或让向导现场生成一对密钥 -->
-                <v-select
-                  :label="$t('relay.tls')"
-                  :hint="$t('relay.tlsHint')"
-                  persistent-hint
-                  :items="tlsOptions"
-                  v-model="form.tlsId"
-                  hide-details="auto"
-                />
-              </v-col>
+
+              <!-- Hysteria2 专用：节点地址 / SNI / TLS / 混淆 -->
+              <template v-if="isHy2">
+                <v-col cols="12" sm="7">
+                  <!-- 写进节点链接的主机名。留空则用当前访问面板的域名/IP -->
+                  <v-text-field
+                    :label="$t('relay.address')"
+                    :hint="$t('relay.addressHint')"
+                    persistent-hint
+                    v-model="form.address"
+                    :placeholder="defaultHost"
+                  />
+                </v-col>
+                <v-col cols="12" sm="5">
+                  <v-switch
+                    :label="$t('relay.obfs')"
+                    :hint="$t('relay.obfsHint')"
+                    persistent-hint
+                    v-model="form.obfs"
+                    color="primary"
+                    density="compact"
+                    hide-details="auto"
+                  />
+                </v-col>
+                <v-col cols="12" sm="7">
+                  <v-text-field
+                    :label="$t('relay.sni')"
+                    :hint="$t('relay.sniHint')"
+                    persistent-hint
+                    v-model="form.sni"
+                    :placeholder="defaultHost"
+                  />
+                </v-col>
+                <v-col cols="12" sm="5">
+                  <v-select
+                    :label="$t('relay.tlsCert')"
+                    :hint="$t('relay.tlsCertHint')"
+                    persistent-hint
+                    :items="tlsOptions"
+                    v-model="form.tlsId"
+                    hide-details="auto"
+                  />
+                </v-col>
+              </template>
+
+              <!-- VLESS+Reality 专用 -->
+              <template v-else>
+                <v-col cols="12" sm="7">
+                  <!-- Reality 伪装域名：握手转发到哪。必须是本机可达的 TLS 站点 -->
+                  <v-text-field
+                    :label="$t('relay.dest')"
+                    :hint="$t('relay.destHint')"
+                    persistent-hint
+                    v-model="form.dest"
+                  />
+                </v-col>
+                <v-col cols="12" sm="5">
+                  <!-- 复用一份已有的 reality 配置，或让向导现场生成一对密钥 -->
+                  <v-select
+                    :label="$t('relay.tls')"
+                    :hint="$t('relay.tlsHint')"
+                    persistent-hint
+                    :items="tlsOptions"
+                    v-model="form.tlsId"
+                    hide-details="auto"
+                  />
+                </v-col>
+              </template>
             </template>
           </v-row>
 
@@ -190,8 +289,7 @@ import { push } from 'notivue'
 import { InTypes, createInbound } from '@/types/inbounds'
 import { createClient } from '@/types/clients'
 
-// 自动建站生成的入口入站协议。目前是 vless + reality：落地是 socks5，
-// 但客户端是从公网连进来的，这一段值得真加密。
+// 自动建站默认的入口协议（旧行为：vless + reality）。
 const PROVISION_TYPE = InTypes.VLESS
 
 // 端口随机范围，与「入站管理」页新建入站时用的是同一段。
@@ -200,6 +298,9 @@ const PORT_MAX = 60000
 
 // Reality 伪装站点的默认握手端口。
 const DEFAULT_DEST_PORT = 443
+
+// hy2 的 QUIC 只跑 h3，TLS 两侧都显式写上，省得依赖 sing-box 的默认值。
+const HY2_ALPN = ['h3']
 
 // tag / 用户名里允许的字符，其余一律换成 '-'。sing-box 的 tag 会被规则、
 // 统计、日志到处引用，留着空格或引号只会给自己找麻烦。
@@ -217,9 +318,28 @@ function remarkOf(link: string): string {
   return safeName(remark)
 }
 
+// 当前访问面板时用的主机名，作为「节点地址 / SNI」的默认值。
+function currentHost(): string {
+  try {
+    return window.location.hostname || ''
+  } catch {
+    return ''
+  }
+}
+
+// 节点地址只留主机名：误粘的 http(s):// 前缀和 /path 都去掉。
+// 端口不动（入站端口由向导分配，IPv6 的冒号也不能乱切）。
+function normalizeHost(raw: string): string {
+  let h = (raw || '').trim()
+  if (!h) return ''
+  h = h.replace(/^[a-z][a-z0-9+.-]*:\/\//i, '')
+  h = h.replace(/\/.*$/, '')
+  return h.trim()
+}
+
 export default {
   props: ['visible'],
-  emits: ['close'],
+  emits: ['close', 'created'],
   data() {
     return {
       loading: false,
@@ -231,9 +351,14 @@ export default {
         inbounds: <string[]>[],
         users: <string[]>[],
         // --- 以下只有 provision 模式用 ---
+        // 入口协议：vless（VLESS+Reality）| hysteria2（Hysteria2+住宅 IP）
+        protocol: 'vless',
         perNode: 1,
         dest: 'www.apple.com',
-        tlsId: 0, // 0 = 让向导现场生成一对 reality 密钥
+        tlsId: 0, // 0 = 让向导现场生成（reality 密钥对 / 自签证书）
+        address: '', // 节点链接里的主机名，留空则用当前访问面板的域名/IP
+        sni: '',     // 自签证书的域名，同时作为客户端 SNI
+        obfs: false, // hy2 的 salamander 混淆
       },
       result: <any>null,
     }
@@ -252,6 +377,11 @@ export default {
     links(v: string[]) {
       if (v.length > 1 && this.mode == 'attach') this.mode = 'provision'
     },
+    // 换协议，之前选的 TLS 就不适用了（reality 配置 vs 证书配置），归零重选
+    'form.protocol'() {
+      this.form.tlsId = 0
+      this.result = null
+    },
     mode() {
       this.result = null
     },
@@ -263,6 +393,35 @@ export default {
         .split('\n')
         .map((l: string) => l.trim())
         .filter((l: string) => l.length > 0)
+    },
+    isHy2(): boolean {
+      return this.form.protocol === 'hysteria2'
+    },
+    defaultHost(): string {
+      return currentHost()
+    },
+    linkLabel(): string {
+      if (this.mode != 'provision') return i18n.global.t('relay.link')
+      return this.isHy2 ? i18n.global.t('relay.sockList') : i18n.global.t('relay.bulkLinks')
+    },
+    linkHint(): string {
+      if (this.mode != 'provision') return i18n.global.t('relay.linkHint')
+      return this.isHy2 ? i18n.global.t('relay.sockListHint') : i18n.global.t('relay.bulkLinksHint')
+    },
+    // hy2 模式的逐行解析预览。只做前端判断（socks5 写法固定），
+    // 不通过的行在建任何东西之前就标出来。
+    bulkPreview(): { index: number, ok: boolean, text: string, detail: string }[] {
+      if (!this.isHy2) return []
+      return this.links.map((raw: string, i: number) => {
+        const parsed = this.parseSocksLine(raw)
+        if (!parsed) {
+          return { index: i + 1, ok: false, text: raw, detail: i18n.global.t('relay.previewBad') }
+        }
+        const ob = parsed.ob
+        const who = ob.username ? ob.username : i18n.global.t('relay.previewNoAuth')
+        const detail = who + (parsed.remark ? ' · ' + parsed.remark : '')
+        return { index: i + 1, ok: true, text: ob.server + ':' + ob.server_port, detail }
+      })
     },
     // 可作为中转入口的入站 = 携带用户流量的入站（有 users 字段的）。
     // 纯转发的入站（比如落地机上的）不该再被转出去。
@@ -281,10 +440,22 @@ export default {
         .filter((c: any) => Array.isArray(c.inbounds) && c.inbounds.some((id: number) => ids.includes(id)))
         .map((c: any) => c.name)
     },
-    // 已有的 reality 配置。自动建站时共用一份完全没问题 —— reality 握手的
-    // 是同一个伪装站点，密钥和 short_id 共用也不会互相干扰。
+    // TLS 下拉：按协议给不同的候选。
+    //   vless    —— 只列开了 reality 的配置
+    //   hysteria2 —— 只列带服务端证书的配置（certificate / path / provider 任一）
     tlsOptions(): { title: string, value: number }[] {
-      const opts = (Data().tlsConfigs || [])
+      const list = Data().tlsConfigs || []
+      if (this.isHy2) {
+        const opts = list
+          .filter((t: any) => t.server?.enabled && (
+            (Array.isArray(t.server?.certificate) && t.server.certificate.length > 0) ||
+            t.server?.certificate_path ||
+            t.server?.certificate_provider
+          ))
+          .map((t: any) => ({ title: t.name, value: t.id }))
+        return [{ title: i18n.global.t('relay.tlsSelfSigned'), value: 0 }, ...opts]
+      }
+      const opts = list
         .filter((t: any) => t.server?.reality?.enabled)
         .map((t: any) => ({ title: t.name, value: t.id }))
       return [{ title: i18n.global.t('relay.tlsAuto'), value: 0 }, ...opts]
@@ -297,7 +468,8 @@ export default {
       // （表现为"我原来的节点全变成中转的 IP 了"）。让用户自己挑。
       this.form = {
         link: '', name: '', inbounds: [], users: [],
-        perNode: 1, dest: 'www.apple.com', tlsId: 0,
+        protocol: 'vless', perNode: 1, dest: 'www.apple.com', tlsId: 0,
+        address: '', sni: '', obfs: false,
       }
       this.mode = 'attach'
       this.result = null
@@ -307,28 +479,84 @@ export default {
       this.$emit('close')
     },
     // -----------------------------------------------------------------
-    // 前端直接解析 SOCKS5 落地，省一次后端往返。
-    // 支持两种写法：
+    // 解析一行落地节点。socks5 的写法各家不统一，这里收四种：
     //   socks5://[user:pass@]host:port
-    //   IP:PORT 或 IP:PORT:USER:PASS（纯 IPv4）
-    // 解析不出返回 null，交给后端 linkConvert 兜底。
+    //   user:pass@host:port
+    //   host:port  /  host:port:user:pass
+    // 末尾可带 #备注。host 可以是域名或 IPv4，IPv6 要带方括号。
+    // 解析不出返回 null —— attach 模式交给后端 linkConvert 兜底，
+    // hy2 模式则直接判定这一行不合法。
     // -----------------------------------------------------------------
+    splitHostPort(s: string): { host: string, port: number } | null {
+      const m = s.match(/^\[([^\]]+)\]:(\d{1,5})$/) || s.match(/^([^:\s]+):(\d{1,5})$/)
+      if (!m) return null
+      const port = parseInt(m[2], 10)
+      if (!Number.isInteger(port) || port < 1 || port > 65535) return null
+      return { host: m[1], port }
+    },
+    parseSocksLine(raw: string): { ob: any, remark: string } | null {
+      const src = (raw || '').trim()
+      if (!src) return null
+      const remark = remarkOf(src)
+      const hash = src.indexOf('#')
+      let s = (hash >= 0 ? src.substring(0, hash) : src).trim()
+      if (!s) return null
+
+      // 1) 带 scheme
+      const scheme = s.match(/^socks5?:\/\//i)
+      if (scheme) {
+        s = s.substring(scheme[0].length).replace(/\/+$/, '')
+        let auth = ''
+        const at = s.lastIndexOf('@')
+        if (at >= 0) { auth = s.substring(0, at); s = s.substring(at + 1) }
+        const hp = this.splitHostPort(s)
+        if (!hp) return null
+        const ob: any = { type: 'socks', server: hp.host, server_port: hp.port, version: '5' }
+        if (auth) {
+          const c = auth.indexOf(':')
+          if (c < 0) {
+            ob.username = decodeURIComponent(auth)
+          } else {
+            ob.username = decodeURIComponent(auth.substring(0, c))
+            ob.password = decodeURIComponent(auth.substring(c + 1))
+          }
+        }
+        return { ob, remark }
+      }
+
+      // 2) 无 scheme 但带 @：user:pass@host:port
+      const at = s.lastIndexOf('@')
+      if (at >= 0) {
+        const auth = s.substring(0, at)
+        const hp = this.splitHostPort(s.substring(at + 1))
+        if (!hp) return null
+        const ob: any = { type: 'socks', server: hp.host, server_port: hp.port, version: '5' }
+        const c = auth.indexOf(':')
+        if (c < 0) {
+          ob.username = auth
+        } else {
+          ob.username = auth.substring(0, c)
+          ob.password = auth.substring(c + 1)
+        }
+        return { ob, remark }
+      }
+
+      // 3) host:port[:user[:pass]]。密码里可能还有冒号，剩下的整段当密码。
+      const parts = s.split(':')
+      if (parts.length < 2) return null
+      const hp = this.splitHostPort(parts[0] + ':' + parts[1])
+      if (!hp) return null
+      const ob: any = { type: 'socks', server: hp.host, server_port: hp.port, version: '5' }
+      if (parts.length >= 3 && parts[2] !== '') {
+        ob.username = parts[2]
+        if (parts.length >= 4) ob.password = parts.slice(3).join(':')
+      }
+      return { ob, remark }
+    },
+    // attach 模式只要出站对象，备注用不到
     parseSocks(raw: string): any | null {
-      const uri = raw.match(/^socks5?:\/\/(?:([^:@/]+):([^@/]+)@)?\[?([^\]:/]+)\]?:(\d{1,5})\/?.*$/i)
-      if (uri) {
-        const ob: any = { type: 'socks', server: uri[3], server_port: parseInt(uri[4]), version: '5' }
-        if (uri[1]) { ob.username = decodeURIComponent(uri[1]); ob.password = decodeURIComponent(uri[2]) }
-        return ob
-      }
-      const parts = raw.split(':')
-      if ((parts.length === 2 || parts.length === 4) && /^(\d{1,3}\.){3}\d{1,3}$/.test(parts[0])) {
-        const port = parseInt(parts[1])
-        if (!Number.isInteger(port) || port < 1 || port > 65535) return null
-        const ob: any = { type: 'socks', server: parts[0], server_port: port, version: '5' }
-        if (parts.length === 4) { ob.username = parts[2]; ob.password = parts[3] }
-        return ob
-      }
-      return null
+      const parsed = this.parseSocksLine(raw)
+      return parsed ? parsed.ob : null
     },
     // -----------------------------------------------------------------
     // 生成用的两个「取一个不冲突的」小工具。
@@ -409,6 +637,67 @@ export default {
         client: {
           reality: { enabled: true, public_key: pub },
           utls: <any>{ enabled: true, fingerprint: 'chrome' },
+        },
+      }
+      if (!await Data().save('tls', 'new', tls)) return 0
+      const saved = (Data().tlsConfigs || []).find((t: any) => t.name == tlsName)
+      if (!saved?.id) {
+        push.error({ message: i18n.global.t('relay.bulkNoTls') })
+        return 0
+      }
+      return saved.id
+    },
+    // -----------------------------------------------------------------
+    // Hysteria2 的 TLS：hy2 必须跑在 TLS 上，没有「裸协议」这种选项。
+    // 选了已有配置就复用；没选就现场签一张自签证书。
+    //
+    // 自签那份的客户端侧带 insecure: true —— LinkGenerator 会把它写成
+    // 链接里的 insecure=1，否则客户端会拿自签证书去校验链，必然失败。
+    // 用户填的 SNI 同时进证书 CN/SAN 和服务端 server_name：
+    // 前者让「有域名 + 自签」的组合也能对得上，后者决定链接里的 sni 参数。
+    // -----------------------------------------------------------------
+    async ensureHy2Tls(): Promise<number> {
+      if (this.form.tlsId > 0) return this.form.tlsId
+
+      const sni = normalizeHost(this.form.sni) || currentHost() || 'www.bing.com'
+      const msg = await HttpUtils.get<string[]>('api/keypairs', { k: 'tls', o: sni })
+      if (!msg.success || !Array.isArray(msg.obj) || msg.obj.length == 0) {
+        push.error({ message: i18n.global.t('relay.bulkNoTls') })
+        return 0
+      }
+      // 后端一次性给出「私钥 PEM + 证书 PEM」，按 BEGIN/END 标记切开。
+      const key: string[] = []
+      const cert: string[] = []
+      let mode = ''
+      msg.obj.forEach((line: string) => {
+        if (line === '-----BEGIN PRIVATE KEY-----') { mode = 'key'; key.push(line) }
+        else if (line === '-----END PRIVATE KEY-----') { key.push(line); mode = '' }
+        else if (line === '-----BEGIN CERTIFICATE-----') { mode = 'cert'; cert.push(line) }
+        else if (line === '-----END CERTIFICATE-----') { cert.push(line); mode = '' }
+        else if (mode === 'key') key.push(line)
+        else if (mode === 'cert') cert.push(line)
+      })
+      if (key.length == 0 || cert.length == 0) {
+        push.error({ message: i18n.global.t('relay.bulkNoTls') })
+        return 0
+      }
+
+      const name = safeName(this.form.name) || 'relay'
+      const tlsName = name + '-hy2-' + RandomUtil.randomLowerAndNum(4)
+      const tls = {
+        id: 0,
+        name: tlsName,
+        server: {
+          enabled: true,
+          server_name: sni,
+          alpn: HY2_ALPN,
+          certificate: cert,
+          key: key,
+        },
+        client: {
+          alpn: HY2_ALPN,
+          // 自签证书只能靠 insecure 过，链接里会带 insecure=1
+          insecure: true,
         },
       }
       if (!await Data().save('tls', 'new', tls)) return 0
@@ -502,17 +791,29 @@ export default {
     async createBulk() {
       const links = this.links
       if (links.length === 0) {
-        push.error({ message: i18n.global.t('error.invalidData') + ': ' + i18n.global.t('relay.link') })
+        push.error({ message: i18n.global.t('error.invalidData') + ': ' + this.linkLabel })
         return
       }
+      const hy2 = this.isHy2
       const perNode = Math.min(Math.max(Math.floor(this.form.perNode) || 1, 1), 50)
       this.loading = true
       this.result = null
       try {
         // 1) 先把全部链接解析成出站对象。放在建任何东西之前：
         //    建到第 8 条才发现第 9 行拼错了，留下的就是一堆没有规则的半成品。
+        //    hy2 模式这里只认 socks5（住宅代理导出的就是这几种写法），
+        //    不再走后端 linkConvert —— 免得把一条 vless 链接悄悄做成 socks 落地。
         const nodes: { ob: any, remark: string }[] = []
         for (let i = 0; i < links.length; i++) {
+          if (hy2) {
+            const parsed = this.parseSocksLine(links[i])
+            if (!parsed) {
+              push.error({ message: i18n.global.t('relay.parseSocksLine', { n: i + 1 }) })
+              return
+            }
+            nodes.push(parsed)
+            continue
+          }
           let ob: any = this.parseSocks(links[i])
           if (!ob) {
             const conv = await HttpUtils.post<{ type?: string; tag?: string }>('api/linkConvert', { link: links[i] })
@@ -525,15 +826,18 @@ export default {
           nodes.push({ ob, remark: remarkOf(links[i]) })
         }
 
-        // 2) reality 配置：复用已有的，或现场生成一对密钥。
-        const tlsId = await this.ensureRealityTls()
+        // 2) TLS：vless 要 reality 密钥对，hy2 要服务端证书。
+        const tlsId = hy2 ? await this.ensureHy2Tls() : await this.ensureRealityTls()
         if (!tlsId) return
 
         const pickTag = this.makeTagPicker()
         const pickPort = this.makePortPicker()
         const prefix = safeName(this.form.name) || 'relay'
+        // 链接里用的主机名：填了就写进入站的 addrs，留空则后端用请求的 Host
+        const addr = hy2 ? normalizeHost(this.form.address) : ''
         const rules: any[] = []
         const failed: string[] = []
+        const createdTags: string[] = []
         const takenNames = new Set<string>((Data().clients || []).map((c: any) => c.name))
         let done = 0
 
@@ -557,10 +861,18 @@ export default {
 
           // 3a) 入口入站。addrs / out_json 是「入站管理」页新建时也会带的字段，
           //     缺了它们客户端链接就拼不出来。
-          const inbound: any = createInbound(PROVISION_TYPE, {
-            id: 0, tag: inTag, listen: '::', listen_port: port, tls_id: tlsId,
-          })
-          inbound.addrs = []
+          const inbound: any = hy2
+            ? createInbound(InTypes.Hysteria2, {
+                id: 0, tag: inTag, listen: '::', listen_port: port, tls_id: tlsId,
+              })
+            : createInbound(PROVISION_TYPE, {
+                id: 0, tag: inTag, listen: '::', listen_port: port, tls_id: tlsId,
+              })
+          if (hy2 && this.form.obfs) {
+            // 每个入站一把混淆密码，链接里会带 obfs=salamander&obfs-password=...
+            inbound.obfs = { type: 'salamander', password: RandomUtil.randomSeq(16) }
+          }
+          inbound.addrs = addr ? [{ server: addr, server_port: port, remark: '' }] : []
           inbound.out_json = {}
           if (!await Data().save('inbounds', 'new', inbound)) {
             failed.push(base)
@@ -573,18 +885,25 @@ export default {
           }
 
           // 3b) 用户。每节点 perNode 个，各占一条路由规则（与 attach 模式一致）。
+          //     hy2 的凭据是 config.hysteria2.password，后端按这个字段生成
+          //     入站的 users 列表；name 也要一起写进去（sing-box 用它做会话/统计）。
+          //     同一个节点的用户攒成一个数组走 addbulk：每存一次都会重启核心，
+          //     批量导几十个节点时这一下能省掉大半的重启。
           const names: string[] = []
+          const clients: any[] = []
           for (let u = 0; u < perNode; u++) {
             const userName = perNode == 1 ? base : base + '-' + (u + 1)
             takenNames.add(userName)
             const client: any = createClient({ name: userName, inbounds: [savedInbound.id] })
-            if (!await Data().save('clients', 'new', client)) {
-              failed.push(userName)
-              continue
+            if (hy2) {
+              const cfg = client.config || {}
+              cfg.hysteria2 = { name: userName, password: RandomUtil.randomSeq(16) }
+              client.config = cfg
             }
+            clients.push(client)
             names.push(userName)
           }
-          if (names.length == 0) {
+          if (!await Data().save('clients', 'addbulk', clients)) {
             failed.push(base)
             continue
           }
@@ -601,6 +920,7 @@ export default {
           names.forEach((name: string) => {
             rules.push({ inbound: [inTag], auth_user: [name], action: 'route', outbound: outTag })
           })
+          createdTags.push(inTag)
           done++
         }
 
@@ -620,12 +940,18 @@ export default {
           return
         }
 
-        const created = i18n.global.t('relay.bulkDone', { n: done, rules: rules.length })
+        const created = i18n.global.t(hy2 ? 'relay.bulkDoneHy2' : 'relay.bulkDone', { n: done, rules: rules.length })
         this.result = failed.length == 0
           ? { ok: true, text: created }
           : { ok: false, text: created + ' / ' + i18n.global.t('relay.bulkFail', { list: failed.join(', ') }) }
         push.success({ title: i18n.global.t('success'), message: created })
         this.form.link = ''
+
+        // 5) 把新建的入口入站交给中转页：它会打开「节点链接」弹窗，
+        //    把每个用户的 hysteria2:// 链接直接摊出来（复制 / 二维码 / Base64）。
+        if (createdTags.length > 0) {
+          this.$emit('created', { tags: createdTags, title: prefix })
+        }
       } catch (e: any) {
         push.error({ message: i18n.global.t('error.invalidData') + ': ' + (e?.toString() ?? '') })
       } finally {
