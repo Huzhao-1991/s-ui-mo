@@ -22,7 +22,7 @@
       <v-card-title>
         <v-row>
           <v-col>
-            {{ $t('relay.linksTitle') }}
+            {{ heading || $t('relay.linksTitle') }}
             <span v-if="title" style="font-size: 0.8rem; opacity: 0.6;">· {{ title }}</span>
           </v-col>
           <v-spacer />
@@ -31,7 +31,8 @@
       </v-card-title>
       <v-divider />
       <v-card-text>
-        <p style="font-size: 0.85rem; opacity: 0.8; margin-bottom: 4px;">{{ $t('relay.linksDesc') }}</p>
+        <!-- heading / desc 可选：中转页用默认文案，「一键 Hy2」页面传自己的措辞 -->
+        <p style="font-size: 0.85rem; opacity: 0.8; margin-bottom: 4px;">{{ desc || $t('relay.linksDesc') }}</p>
         <p v-if="tagsText" style="font-size: 0.8rem; opacity: 0.7; margin-bottom: 10px;">
           {{ $t('relay.linksEntry') }}: {{ tagsText }}
         </p>
@@ -121,7 +122,7 @@ import { i18n } from '@/locales'
 import { push } from 'notivue'
 
 export default {
-  props: ['visible', 'inboundTags', 'title'],
+  props: ['visible', 'inboundTags', 'title', 'heading', 'desc'],
   emits: ['close'],
   components: { QrcodeVue },
   data() {

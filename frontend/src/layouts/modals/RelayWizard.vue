@@ -292,6 +292,7 @@ import { i18n } from '@/locales'
 import { push } from 'notivue'
 import { InTypes, createInbound } from '@/types/inbounds'
 import { createClient } from '@/types/clients'
+import { currentHost, normalizeHost, remarkOf, safeName } from '@/plugins/naming'
 
 // 自动建站默认的入口协议（旧行为：vless + reality）。
 const PROVISION_TYPE = InTypes.VLESS
@@ -306,40 +307,8 @@ const DEFAULT_DEST_PORT = 443
 // hy2 的 QUIC 只跑 h3，TLS 两侧都显式写上，省得依赖 sing-box 的默认值。
 const HY2_ALPN = ['h3']
 
-// tag / 用户名里允许的字符，其余一律换成 '-'。sing-box 的 tag 会被规则、
-// 统计、日志到处引用，留着空格或引号只会给自己找麻烦。
-function safeName(raw: string): string {
-  const cleaned = (raw || '').trim().replace(/[^\w\u4e00-\u9fa5.-]/g, '-').replace(/^-+|-+$/g, '')
-  return cleaned.length > 0 ? cleaned : ''
-}
-
-// 分享链接末尾的 #备注。socks5 链接没有统一标准，但各家导出的都带 fragment。
-function remarkOf(link: string): string {
-  const hash = link.indexOf('#')
-  if (hash < 0) return ''
-  let remark = link.substring(hash + 1)
-  try { remark = decodeURIComponent(remark) } catch { /* 不是百分号编码就照原样用 */ }
-  return safeName(remark)
-}
-
-// 当前访问面板时用的主机名，作为「节点地址 / SNI」的默认值。
-function currentHost(): string {
-  try {
-    return window.location.hostname || ''
-  } catch {
-    return ''
-  }
-}
-
-// 节点地址只留主机名：误粘的 http(s):// 前缀和 /path 都去掉。
-// 端口不动（入站端口由向导分配，IPv6 的冒号也不能乱切）。
-function normalizeHost(raw: string): string {
-  let h = (raw || '').trim()
-  if (!h) return ''
-  h = h.replace(/^[a-z][a-z0-9+.-]*:\/\//i, '')
-  h = h.replace(/\/.*$/, '')
-  return h.trim()
-}
+// safeName / remarkOf / currentHost / normalizeHost 见 @/plugins/naming，
+// 「一键 Hy2」页面也要用同一套命名规则。
 
 export default {
   props: ['visible'],
@@ -911,8 +880,8 @@ export default {
           //     hy2 的凭据是 config.hysteria2.password，anytls 是 config.anytls.password
           //     （sing-anytls 按密码认证，不用 uuid）；后端按这些字段生成入站的
           //     users 列表。name 也要一起写进去（sing-box 用它做会话/统计）。
-          //     同一个节点的用户攒成一个数组走 addbulk：每存一次都会重启核心，
-          //     批量导几十个节点时这一下能省掉大半的重启。
+          //     同一个节点的用户攒成一个数组走 addbulk：一次提交，
+          //     省掉逐个用户保存的往返与重复的链接重建。
           const names: string[] = []
           const clients: any[] = []
           for (let u = 0; u < perNode; u++) {

@@ -149,8 +149,8 @@ diff -ruN
  LABEL org.opencontainers.image.authors="alireza7@gmail.com"
 diff -ruN
 --- a/README-mo.md	1970-01-01 08:00:00.000000000 +0800
-+++ b/README-mo.md	2026-10-29 18:14:26.816808300 +0800
-@@ -0,0 +1,568 @@
++++ b/README-mo.md	2026-10-31 11:06:18.917593000 +0800
+@@ -0,0 +1,598 @@
 +# S-UI 1.6.5 魔改版
 +
 +基于 [alireza0/s-ui](https://github.com/alireza0/s-ui) **v1.6.5**（2026-10-15 发布）的二次开发版本。
@@ -423,8 +423,9 @@ diff -ruN
 +  `name` 同时是 sing-box 侧的会话/统计标识，缺了它流量统计会是空白。
 +  链接格式：hy2 是 `hysteria2://密码@host:port?…`，anytls 是
 +  `anytls://密码@host:port?security=tls&insecure=1&sni=…`。
-+- **用户改走 `clients/addbulk`**：同一个节点的 N 个用户一次保存。每存一次客户端都会重启核心，
-+  批量导几十个节点时这一下能省掉大半重启（配置仍然只写一次：N 个节点也只重启一次）。
++- **用户改走 `clients/addbulk`**：同一个节点的 N 个用户一次保存，省掉 N 次保存往返与重复的
++  链接重建。入站与用户的增删都是**热加载**（核心运行时直接 `AddInbound` / 加用户），
++  不重启核心；整批里只有最后写一次 `config` 会重启。
 +- **建完直接摊链接**：向导向上抛 `created` 事件，中转页关掉向导并打开新的**节点链接弹窗**
 +  （`layouts/modals/RelayLinks.vue`）：按用户分组列出 `hysteria2://…` / `anytls://…`，
 +  每条可单条复制、展开二维码，也能明文或 Base64 整包复制。链接**由后端 `util/genLink.go`
@@ -437,6 +438,31 @@ diff -ruN
 +且症状是「TCP 端口通、客户端一直握手超时」）；anytls 走普通 TCP，放行 TCP 即可。
 +自签证书的链接带 `insecure=1`；如果节点地址填的是真实域名、证书也用真证书
 +（选「复用已有证书」），客户端可以不开 insecure。
++
++### 2.11 左侧菜单「一键 Hy2」：不建中转，直接开节点
++
++中转那一套适合「入口 + 住宅 IP 落地」，但如果只是手上有一台 VPS、想赶紧开几个
++hy2 节点给客户端用，走中转向导要先粘 socks5、再建出站和路由，反而绕。这一版在
++左侧菜单（「入站管理」下面）加了一个独立页面 **一键 Hy2**，只做一件事：
++
++> 填几个字段 → 在本机生成 N 个 Hysteria2 入站 + 每个入站上的用户 → 直接把
++> `hysteria2://` 链接摊出来。
++
++- **字段**：节点数量（1-50）、每节点用户数（1-50）、名称前缀、端口（随机 / 指定起始端口）、
++  节点地址、SNI / 证书域名、TLS 证书（现场自签 / 复用已有）、salamander 混淆。
++- **命名**：入站 tag 用 `前缀` 或 `前缀-序号`（`hy2` → `hy2` / `hy2-1`、`hy2-2`…），
++  用户名在每节点多用户时再加 `-序号`；与现有 tag / 用户名冲突会自动补 `-1`、`-2`。
++- **端口**：默认从 10000-60000 挑没被占用的；关掉「随机分配」后从指定端口往后顺延，
++  跳过已占用的。凑不够数量会直接报错，不会建一半。
++- **TLS**：一批节点**共用一份**证书（域名相同，签 N 份只会在 TLS 列表里堆垃圾）。
++  自签那份两侧都写死 `alpn=h3`、客户端带 `insecure`，链接里自动出现 `insecure=1`；
++  有真证书就选「复用已有配置」，链接里就不会有 insecure。
++- **不碰出站和路由**：这里建的节点就是本机直出，适合独立开号；要落地转发请走「中转管理」。
++- **建完直接看链接**：复用中转的「节点链接」弹窗，按用户分组，可单条复制 / 二维码 /
++  明文或 Base64 整包复制；页面右侧还列着**已有的全部 hy2 节点**（tag / 端口 / 用户数 /
++  TLS 是否启用），随时点「链接」重看。
++- **不重启核心**：入站与用户的增删都是热加载（核心运行时 `AddInbound` / 加用户），
++  N 个节点也不会触发 N 次重启。
 +
 +## 3. 相对原魔改版实现上的改进
 +
@@ -520,18 +546,20 @@ diff -ruN
 +
 +### 4.3 本次构建与验证记录
 +
-+本次（`1.6.5-mo4`）在 Windows 本机交叉编译，前端与后端一起重出：
++本次（`1.6.5-mo5`）在 Windows 本机交叉编译，前端与后端一起重出：
 +
 +| 项目 | 结果 |
 +|---|---|
 +| 工具链 | **Go 1.27.2**（上游 1.6.5 的 `go.mod` 要求，1.6.3 只要求 1.26.7，低版本直接拒绝编译）+ zig 0.14.1（`zig cc -target x86_64-linux-musl`），`CGO_ENABLED=1` |
 +| 链接 | `-linkmode external -extldflags '-static -s'`，产出全静态 ELF |
-+| 前端 | TypeScript 6.0.3 / vuetify 4.2.6 / vite 8.3.4；`npm run build`（含 `vue-tsc --noEmit` 类型检查）**零错误**，产物 `961a26c5d4711dd7.js` + `4d2254afda7e0cb9.css` 已嵌入 `web/html` |
-+| 单测 | `npm run test` **131 passed**（5 个文件） |
-+| amd64 | 见 `dist-out/SHA256SUMS`；ELF 64 位 x86-64 全静态已 strip（无 `.symtab` / `.debug_*`，无动态解释器路径），包内二进制确认含 `1.6.5-mo4` |
-+| 版本 | 本版**未在真机跑端到端安装**；anytls 链条（`config.anytls` 凭据 → 入站 users → `anytls://` 链接）只做到前端解析与接口调用层面的核对，后端 `fetchUsers` 白名单与 `genLink.go` 的 `anytlsLink` 为上游既有代码、未改动 |
++| 前端 | TypeScript 6.0.3 / vuetify 4.2.6 / vite 8.3.4；`npm run build`（含 `vue-tsc --noEmit` 类型检查）**零错误**，933 个模块，产物 `9676e32f0ec0a778.js`（2 162 828 B）+ `901d09d4b5fa3d28.css`（772 141 B）已嵌入 `web/html` |
++| 单测 | `npm run test` **131 passed**（5 个文件）；`eslint` 0 error（仅 `any` 警告，与存量代码一致） |
++| amd64 | `s-ui-linux-amd64.tar.gz` **35 286 920 B**（内含 `sui` **99 977 960 B**），sha256 `ce7825af…b8d940929`；ELF 64 位 x86-64 全静态已 strip（无 `.symtab` / `.debug_*`，无动态解释器路径，`libc.so` 无引用），包内二进制确认含 `1.6.5-mo5` |
++| 版本 | 本版**未在真机跑端到端安装**；「一键 Hy2」页面（签名单证书 → 批量入站 → `addbulk` 建用户 → `hysteria2://` 链接）只做到前端解析与接口调用层面的核对，后端代码未改动 |
 +
-+相对 `1.6.5-mo3`，本版仍只改前端（向导加 anytls 协议档 + 文案），后端代码未改动。
++相对 `1.6.5-mo4`，前端 bundle 大了 13 704 B（2 149 124 → 2 162 828 B），
++二进制同步大了 12 672 B（99 965 288 → 99 977 960 B），差值全部来自新增的
++「一键 Hy2」页面、`plugins/naming.ts` 抽取与文案，后端代码未改动。
 +
 +比 1.6.3 基线小了约 2.5 MB（`sui` 102 457 288 → 99 948 328 B），来自上游 1.6.5 自身的变化。
 +
@@ -683,13 +711,13 @@ diff -ruN
 +| `cmd/token.go` / `cmd/cmd.go` | `s-ui token` 子命令 |
 +| `util/shadowsocks.go` | SS-2022 32 字节密钥方法 |
 +| `config/config.go` | `PanelRepo` / `GetPanelRepo` |
-+| `config/version` | `1.6.5-mo4` |
++| `config/version` | `1.6.5-mo5` |
 +
 +前端：
 +
 +| 文件 | 说明 |
 +|---|---|
-+| `src/layouts/default/Drawer.vue` | 菜单项 + 当前管理对象提示 |
++| `src/layouts/default/Drawer.vue` | 菜单项 + 当前管理对象提示（新增「一键 Hy2」入口） |
 +| `src/layouts/modals/Client.vue` | 新增 `presetInbounds`：从别处新增用户时预勾入站 |
 +| `src/layouts/modals/ExportLinks.vue` | 新增：导出订阅 URL / 分享链接弹窗 |
 +| `src/layouts/modals/RelayUsers.vue` | 新增：中转用户管理（列表 / 增删改 / 启用 / 二维码） |
@@ -699,10 +727,12 @@ diff -ruN
 +| `src/locales/{en,zhcn,zhtw}.ts` | 新增文案（三份的覆盖范围见 §8） |
 +| `src/plugins/api.ts` | 每个请求注入 `X-Remote-Server` |
 +| `src/plugins/remote.ts` | 新增：当前被管理面板的 id（含持久化） |
-+| `src/router/index.ts` | `/servers`、`/relay` 路由；启动时拉一次列表 |
++| `src/router/index.ts` | `/servers`、`/relay`、`/hy2` 路由；启动时拉一次列表 |
 +| `src/store/modules/data.ts` | servers / currentServer / loadServers / switchServer |
 +| `src/types/servers.ts` | 新增：Server 类型 |
 +| `src/views/Relay.vue` | 新增：中转管理页（每张卡片带测速 / 用户管理 / 节点链接） |
++| `src/views/Hy2.vue` | 新增：一键 Hy2 页（批量建本机 hy2 入站 + 用户，摊链接；右侧列已有 hy2 节点） |
++| `src/plugins/naming.ts` | 新增：safeName / currentHost / normalizeHost / remarkOf（中转向导与一键 Hy2 共用） |
 +| `src/views/Servers.vue` | 新增：服务器列表页 |
 +| `src/views/Settings.vue` | 版本检查 + 一键升级按钮 |
 +
@@ -1420,11 +1450,11 @@ diff -ruN
  }
 diff -ruN
 --- a/config/version	2026-10-15 19:44:34.000000000 +0800
-+++ b/config/version	2026-10-29 18:11:56.146442200 +0800
++++ b/config/version	2026-10-31 11:05:01.340941800 +0800
 @@ -1 +1 @@
 -1.6.5
 \ No newline at end of file
-+1.6.5-mo4
++1.6.5-mo5
 \ No newline at end of file
 diff -ruN
 --- a/database/model/server.go	1970-01-01 08:00:00.000000000 +0800

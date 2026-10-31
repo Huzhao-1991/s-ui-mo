@@ -26,6 +26,12 @@ const routes = [
         component: () => import('@/views/Inbounds.vue'),
       },
       {
+        // 一键 Hy2：只建本机 hy2 入站 + 用户，不碰出站与路由。
+        path: '/hy2',
+        name: 'pages.hy2',
+        component: () => import('@/views/Hy2.vue'),
+      },
+      {
         // 中转管理：把入口入站的流量经落地节点转发出去。
         // 纯前端页面，数据全部来自 config.route.rules + outbounds。
         path: '/relay',

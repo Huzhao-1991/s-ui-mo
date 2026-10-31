@@ -76,6 +76,8 @@ const managedName = computed((): string => {
 const menu = [
   { title: 'pages.home', icon: 'mdi-home',  path: '/' },
   { title: 'pages.inbounds', icon: 'mdi-cloud-download',  path: '/inbounds' },
+  // 一键 Hy2：只建本机 hy2 节点（入站 + 用户 + 链接），不涉及落地
+  { title: 'pages.hy2', icon: 'mdi-lightning-bolt',  path: '/hy2' },
   // 中转管理：与参考魔改版一致，紧挨在入站管理后面
   { title: 'pages.relay', icon: 'mdi-transit-connection-variant',  path: '/relay' },
   { title: 'pages.clients', icon: 'mdi-account-multiple',  path: '/clients' },
