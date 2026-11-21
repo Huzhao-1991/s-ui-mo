@@ -1,13 +1,22 @@
 <template>
   <!-- ======================================================================
-    一键搭建 Hysteria2 节点（Hy2）
+    一键搭建节点（Hysteria2 / Trojan / AnyTLS）
     --------------------------------------------------------------------
-    面板左侧菜单里的独立入口，做的事很单一：填几个字段，直接在本机生成
-    N 个 Hysteria2 入站 + 每个入站上的用户，然后把 hysteria2:// 链接摊出来。
+    面板左侧菜单里的独立入口，做的事很单一：选协议、填几个字段，直接在本机
+    生成 N 个入站 + 每个入站上的用户，然后把节点链接摊出来。
 
     与「中转管理」的区别：那边是「入口 + 住宅 socks5 落地」，要出站和路由规则；
     这边不碰出站、不写路由，建出来的就是本机直出的普通节点 —— 适合
-    「手上有一台 VPS，想赶紧开几个 hy2 节点给客户端用」的场景。
+    「手上有一台 VPS，想赶紧开几个节点给客户端用」的场景。
+
+    三种协议的共同点：都必须跑 TLS（hy2 是 QUIC 固有要求；trojan / anytls
+    的客户端也按 TLS 语义连接，裸跑的链接客户端认不了），所以 TLS 字段共用，
+    自签那份客户端侧带 insecure，链接里会自动出现 insecure=1。
+
+    差异点：
+      - hysteria2 跑 QUIC/UDP，TLS 两侧写死 alpn=h3；可选 salamander 混淆
+      - trojan / anytls 跑 TCP/TLS，alpn 留空不写死；没有混淆的概念
+      - anytls 入站自带 padding_scheme（sing-anytls 的默认流量整形）
 
     后端不需要任何新接口，全部复用：
       - api/keypairs?k=tls&o=<SNI>   现场签自签证书（要证书就用，不要就复用已有 TLS）
@@ -15,34 +24,43 @@
       - api/save object=inbounds     建入站
       - api/save object=clients      addbulk 一次建完一个入站上的全部用户
       - api/clients?id=…             取带 links 的完整客户端行（链接弹窗用）
+      - util/genLink.go              链接生成（hysteria2:// / trojan:// / anytls://）
 
     端口：默认从 10000-60000 随机挑没被占用的；也可以指定起始端口顺序分配。
-    TLS：hy2 必须跑 TLS。自签那份客户端侧带 insecure，链接里会自动出现
-    insecure=1；服务端与客户端两侧都写死 alpn=h3（QUIC 只跑 h3）。
     ====================================================================== -->
   <RelayLinks
     :visible="links.visible"
     :inbound-tags="links.tags"
     :title="links.title"
-    :heading="$t('hy2.linksTitle')"
-    :desc="$t('hy2.linksDesc')"
+    :heading="$t('quick.linksTitle', { proto: protoName })"
+    :desc="$t('quick.linksDesc', { proto: protoName })"
     @close="links.visible = false"
   />
 
   <v-row>
     <!-- 左：创建表单 -->
     <v-col cols="12" md="5">
-      <v-card rounded="xl" elevation="3" :title="$t('hy2.formTitle')" :subtitle="$t('hy2.formSubtitle')">
+      <v-card rounded="xl" elevation="3" :title="$t('quick.formTitle')" :subtitle="$t('quick.formSubtitle')">
         <v-card-text>
           <v-row dense>
+            <v-col cols="12">
+              <v-btn-toggle v-model="form.protocol" mandatory color="primary" density="compact">
+                <v-btn value="hysteria2" size="small">{{ $t('quick.protoHy2') }}</v-btn>
+                <v-btn value="trojan" size="small">{{ $t('quick.protoTrojan') }}</v-btn>
+                <v-btn value="anytls" size="small">{{ $t('quick.protoAnytls') }}</v-btn>
+              </v-btn-toggle>
+              <p style="font-size: 0.78rem; opacity: 0.75; margin-top: 6px;">
+                {{ $t('quick.protoHint_' + form.protocol) }}
+              </p>
+            </v-col>
             <v-col cols="6">
               <v-text-field
                 v-model.number="form.count"
                 type="number"
                 min="1"
                 max="50"
-                :label="$t('hy2.count')"
-                :hint="$t('hy2.countHint')"
+                :label="$t('quick.count')"
+                :hint="$t('quick.countHint')"
                 persistent-hint
               />
             </v-col>
@@ -52,25 +70,25 @@
                 type="number"
                 min="1"
                 max="50"
-                :label="$t('hy2.perNode')"
-                :hint="$t('hy2.perNodeHint')"
+                :label="$t('quick.perNode')"
+                :hint="$t('quick.perNodeHint')"
                 persistent-hint
               />
             </v-col>
             <v-col cols="12">
               <v-text-field
                 v-model="form.prefix"
-                :label="$t('hy2.prefix')"
-                :hint="$t('hy2.prefixHint')"
+                :label="$t('quick.prefix')"
+                :hint="$t('quick.prefixHint')"
                 persistent-hint
-                placeholder="hy2"
+                :placeholder="form.protocol"
               />
             </v-col>
             <v-col cols="12">
               <v-switch
                 v-model="form.autoPort"
-                :label="$t('hy2.autoPort')"
-                :hint="$t('hy2.autoPortHint')"
+                :label="$t('quick.autoPort')"
+                :hint="$t('quick.autoPortHint')"
                 persistent-hint
                 color="primary"
                 density="compact"
@@ -83,16 +101,16 @@
                 type="number"
                 min="1"
                 max="65535"
-                :label="$t('hy2.startPort')"
-                :hint="$t('hy2.startPortHint')"
+                :label="$t('quick.startPort')"
+                :hint="$t('quick.startPortHint')"
                 persistent-hint
               />
             </v-col>
             <v-col cols="12">
               <v-text-field
                 v-model="form.address"
-                :label="$t('hy2.address')"
-                :hint="$t('hy2.addressHint')"
+                :label="$t('quick.address')"
+                :hint="$t('quick.addressHint')"
                 persistent-hint
                 :placeholder="defaultHost"
               />
@@ -100,8 +118,8 @@
             <v-col cols="12">
               <v-text-field
                 v-model="form.sni"
-                :label="$t('hy2.sni')"
-                :hint="$t('hy2.sniHint')"
+                :label="$t('quick.sni')"
+                :hint="$t('quick.sniHint')"
                 persistent-hint
                 :placeholder="defaultHost"
               />
@@ -110,16 +128,16 @@
               <v-select
                 v-model="form.tlsId"
                 :items="tlsOptions"
-                :label="$t('hy2.tls')"
-                :hint="$t('hy2.tlsHint')"
+                :label="$t('quick.tls')"
+                :hint="$t('quick.tlsHint')"
                 persistent-hint
               />
             </v-col>
-            <v-col cols="12">
+            <v-col v-if="form.protocol === 'hysteria2'" cols="12">
               <v-switch
                 v-model="form.obfs"
-                :label="$t('hy2.obfs')"
-                :hint="$t('hy2.obfsHint')"
+                :label="$t('quick.obfs')"
+                :hint="$t('quick.obfsHint')"
                 persistent-hint
                 color="primary"
                 density="compact"
@@ -141,26 +159,26 @@
             :loading="loading"
             @click="create"
           >
-            {{ $t('hy2.create') }}
+            {{ $t('quick.create') }}
           </v-btn>
         </v-card-actions>
       </v-card>
     </v-col>
 
-    <!-- 右：已有的 hy2 节点，随时能再看链接 -->
+    <!-- 右：当前协议已有的节点，随时能再看链接 -->
     <v-col cols="12" md="7">
-      <v-card rounded="xl" elevation="3" :title="$t('hy2.existingTitle')" :subtitle="$t('hy2.existingSubtitle')">
+      <v-card rounded="xl" elevation="3" :title="$t('quick.existingTitle', { proto: protoName })" :subtitle="$t('quick.existingSubtitle', { proto: protoName })">
         <v-card-text>
           <div v-if="rows.length === 0" style="text-align: center; opacity: 0.6; padding: 28px;">
-            {{ $t('hy2.empty') }}
+            {{ $t('quick.empty', { proto: protoName }) }}
           </div>
           <v-table v-else density="compact">
             <thead>
               <tr>
-                <th>{{ $t('hy2.colTag') }}</th>
-                <th>{{ $t('hy2.colPort') }}</th>
-                <th>{{ $t('hy2.colUsers') }}</th>
-                <th>{{ $t('hy2.colTls') }}</th>
+                <th>{{ $t('quick.colTag') }}</th>
+                <th>{{ $t('quick.colPort') }}</th>
+                <th>{{ $t('quick.colUsers') }}</th>
+                <th>{{ $t('quick.colTls') }}</th>
                 <th />
               </tr>
             </thead>
@@ -178,7 +196,7 @@
                     prepend-icon="mdi-link-variant"
                     @click="openLinks([r.tag], r.tag)"
                   >
-                    {{ $t('hy2.links') }}
+                    {{ $t('quick.links') }}
                   </v-btn>
                 </td>
               </tr>
@@ -208,6 +226,21 @@ const PORT_MAX = 60000
 // hy2 的 QUIC 只跑 h3，TLS 两侧都显式写上，省得依赖 sing-box 的默认值。
 const HY2_ALPN = ['h3']
 
+// 三种协议的差异全部收在这张表里：
+//   type   —— 入站工厂用的 InTypes 枚举
+//   cred   —— 用户凭据写在 config 的哪个键下（sing-box 都按 password 认证，
+//             name 同时是会话/统计标识，缺了流量统计会是空白）
+//   suffix —— 自签 TLS 配置名的协议后缀
+//   alpn   —— hy2 写死 h3；trojan / anytls 留空不写死
+type ProtoKey = 'hysteria2' | 'trojan' | 'anytls'
+const PROTOCOLS: Record<ProtoKey, {
+  type: string, cred: string, suffix: string, alpn?: string[]
+}> = {
+  hysteria2: { type: InTypes.Hysteria2, cred: 'hysteria2', suffix: 'hy2', alpn: HY2_ALPN },
+  trojan:    { type: InTypes.Trojan,    cred: 'trojan',    suffix: 'trojan' },
+  anytls:    { type: InTypes.AnyTls,    cred: 'anytls',    suffix: 'anytls' },
+}
+
 export default {
   components: { RelayLinks },
   data() {
@@ -215,6 +248,7 @@ export default {
       loading: false,
       result: <any>null,
       form: {
+        protocol: <ProtoKey>'hysteria2',
         count: 1,          // 建几个节点
         perNode: 1,        // 每个节点上几个用户
         prefix: 'hy2',     // tag / 用户名的前缀
@@ -223,7 +257,7 @@ export default {
         address: '',       // 写进入站 addrs，链接里就用它；留空回退到面板域名
         sni: '',           // 自签证书的域名，同时作为客户端 SNI
         tlsId: 0,          // 0 = 现场自签；>0 = 复用已有证书配置
-        obfs: false,       // salamander 混淆
+        obfs: false,       // salamander 混淆（仅 hysteria2）
       },
       links: {
         visible: false,
@@ -232,7 +266,20 @@ export default {
       },
     }
   },
+  watch: {
+    // 换协议时把前缀重置成对应默认值 —— 上次填的 hy2 前缀拖到 trojan 上只会困惑。
+    'form.protocol'(v: ProtoKey) {
+      this.form.prefix = v
+    },
+  },
   computed: {
+    proto(): (typeof PROTOCOLS)[ProtoKey] {
+      return PROTOCOLS[this.form.protocol] || PROTOCOLS.hysteria2
+    },
+    protoName(): string {
+      return i18n.global.t('quick.proto' + this.form.protocol.charAt(0).toUpperCase() + this.form.protocol.slice(1))
+        || this.form.protocol
+    },
     defaultHost(): string {
       return currentHost()
     },
@@ -246,13 +293,14 @@ export default {
           t.server?.certificate_provider
         ))
         .map((t: any) => ({ title: t.name, value: t.id }))
-      return [{ title: i18n.global.t('hy2.tlsSelfSigned'), value: 0 }, ...opts]
+      return [{ title: i18n.global.t('quick.tlsSelfSigned'), value: 0 }, ...opts]
     },
-    // 已有 hy2 入站列表：按端口排序，用户数从客户端表里数出来。
+    // 当前协议的已有入站列表：按端口排序，用户数从客户端表里数出来。
     rows(): { id: number, tag: string, port: number, users: number, tls: string }[] {
       const clients = Data().clients || []
+      const type = this.proto.type
       return (Data().inbounds || [])
-        .filter((i: any) => i.type === InTypes.Hysteria2)
+        .filter((i: any) => i.type === type)
         .map((i: any) => ({
           id: i.id,
           tag: i.tag,
@@ -318,6 +366,8 @@ export default {
     // TLS：选了已有配置就复用；否则现场签一张自签证书。
     // 一批节点共用同一份证书 —— 域名一样，签 N 份只会在 TLS 列表里堆垃圾。
     // 自签的客户端侧带 insecure: true，后端 LinkGenerator 会写成 insecure=1。
+    // alpn 只给 hysteria2 写 h3（QUIC 只跑 h3）；trojan / anytls 留空，
+    // 不写死免得跟客户端对不上。
     // -----------------------------------------------------------------
     async ensureTls(prefix: string): Promise<number> {
       if (this.form.tlsId > 0) return this.form.tlsId
@@ -325,7 +375,7 @@ export default {
       const sni = normalizeHost(this.form.sni) || currentHost() || 'www.bing.com'
       const msg = await HttpUtils.get<string[]>('api/keypairs', { k: 'tls', o: sni })
       if (!msg.success || !Array.isArray(msg.obj) || msg.obj.length == 0) {
-        push.error({ message: i18n.global.t('hy2.noTls') })
+        push.error({ message: i18n.global.t('quick.noTls') })
         return 0
       }
       // 后端一次性给出「私钥 PEM + 证书 PEM」，按 BEGIN/END 标记切开。
@@ -341,48 +391,52 @@ export default {
         else if (mode === 'cert') cert.push(line)
       })
       if (key.length == 0 || cert.length == 0) {
-        push.error({ message: i18n.global.t('hy2.noTls') })
+        push.error({ message: i18n.global.t('quick.noTls') })
         return 0
       }
 
-      const tlsName = prefix + '-hy2-' + RandomUtil.randomLowerAndNum(4)
-      const tls = {
+      const tlsName = prefix + '-' + this.proto.suffix + '-' + RandomUtil.randomLowerAndNum(4)
+      const tls: any = {
         id: 0,
         name: tlsName,
         server: {
           enabled: true,
           server_name: sni,
-          alpn: HY2_ALPN,
           certificate: cert,
           key: key,
         },
         client: {
-          alpn: HY2_ALPN,
           // 自签证书只能靠 insecure 过，链接里会带 insecure=1
           insecure: true,
         },
       }
+      if (this.proto.alpn) {
+        tls.server.alpn = this.proto.alpn
+        tls.client.alpn = this.proto.alpn
+      }
       if (!await Data().save('tls', 'new', tls)) return 0
       const saved = (Data().tlsConfigs || []).find((t: any) => t.name == tlsName)
       if (!saved?.id) {
-        push.error({ message: i18n.global.t('hy2.noTls') })
+        push.error({ message: i18n.global.t('quick.noTls') })
         return 0
       }
       return saved.id
     },
     // -----------------------------------------------------------------
     // 一键创建：端口 → TLS → 逐个入站 → 每个入站的用户（addbulk）。
-    // 用户凭据是 config.hysteria2 = {name, password}：hy2 按密码认证，
+    // 用户凭据写在 config.<cred> = {name, password}：三种协议都按密码认证，
     // name 同时是 sing-box 侧的会话/统计标识，缺了流量统计会是空白。
     // -----------------------------------------------------------------
     async create() {
       const count = Math.min(Math.max(Math.floor(this.form.count) || 1, 1), 50)
       const perNode = Math.min(Math.max(Math.floor(this.form.perNode) || 1, 1), 50)
-      const prefix = safeName(this.form.prefix) || 'hy2'
+      const protoKey: ProtoKey = this.form.protocol
+      const proto = this.proto
+      const prefix = safeName(this.form.prefix) || protoKey
 
       const ports = this.allocPorts(count)
       if (ports.length < count) {
-        push.error({ message: i18n.global.t('hy2.noPort') })
+        push.error({ message: i18n.global.t('quick.noPort') })
         return
       }
 
@@ -405,11 +459,11 @@ export default {
           const port = ports[i]
 
           // 1) 入站。addrs / out_json 是「入站管理」页新建时也会带的字段，
-          //    缺了它们客户端链接就拼不出来。
-          const inbound: any = createInbound(InTypes.Hysteria2, {
+          //    缺了它们客户端链接就拼不出来。anytls 工厂自带 padding_scheme。
+          const inbound: any = createInbound(proto.type, {
             id: 0, tag, listen: '::', listen_port: port, tls_id: tlsId,
           })
-          if (this.form.obfs) {
+          if (protoKey === 'hysteria2' && this.form.obfs) {
             // 每个入站一把混淆密码，链接里会带 obfs=salamander&obfs-password=...
             inbound.obfs = { type: 'salamander', password: RandomUtil.randomSeq(16) }
           }
@@ -435,7 +489,7 @@ export default {
 
             const client: any = createClient({ name: userName, inbounds: [savedInbound.id] })
             const cfg = client.config || {}
-            cfg.hysteria2 = { name: userName, password: RandomUtil.randomSeq(16) }
+            cfg[proto.cred] = { name: userName, password: RandomUtil.randomSeq(16) }
             client.config = cfg
             clients.push(client)
           }
@@ -450,15 +504,15 @@ export default {
         }
 
         if (tags.length === 0) {
-          this.result = { ok: false, text: i18n.global.t('hy2.fail', { list: failed.join(', ') }) }
+          this.result = { ok: false, text: i18n.global.t('quick.fail', { list: failed.join(', ') }) }
           push.error({ message: this.result.text })
           return
         }
 
-        const done = i18n.global.t('hy2.created', { n: tags.length, users })
+        const done = i18n.global.t('quick.created', { n: tags.length, users, proto: this.protoName })
         this.result = failed.length == 0
           ? { ok: true, text: done }
-          : { ok: false, text: done + ' / ' + i18n.global.t('hy2.fail', { list: failed.join(', ') }) }
+          : { ok: false, text: done + ' / ' + i18n.global.t('quick.fail', { list: failed.join(', ') }) }
         push.success({ title: i18n.global.t('success'), message: done })
 
         // 3) 建完直接把链接摊出来（复制 / 二维码 / Base64 整包）。

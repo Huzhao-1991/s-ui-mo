@@ -149,8 +149,8 @@ diff -ruN
  LABEL org.opencontainers.image.authors="alireza7@gmail.com"
 diff -ruN
 --- a/README-mo.md	1970-01-01 08:00:00.000000000 +0800
-+++ b/README-mo.md	2026-10-31 11:06:18.917593000 +0800
-@@ -0,0 +1,598 @@
++++ b/README-mo.md	2026-11-21 22:21:41.459557000 +0800
+@@ -0,0 +1,608 @@
 +# S-UI 1.6.5 魔改版
 +
 +基于 [alireza0/s-ui](https://github.com/alireza0/s-ui) **v1.6.5**（2026-10-15 发布）的二次开发版本。
@@ -439,28 +439,38 @@ diff -ruN
 +自签证书的链接带 `insecure=1`；如果节点地址填的是真实域名、证书也用真证书
 +（选「复用已有证书」），客户端可以不开 insecure。
 +
-+### 2.11 左侧菜单「一键 Hy2」：不建中转，直接开节点
++### 2.11 左侧菜单「一键节点」：Hysteria2 / Trojan / AnyTLS，不建中转直接开
 +
 +中转那一套适合「入口 + 住宅 IP 落地」，但如果只是手上有一台 VPS、想赶紧开几个
-+hy2 节点给客户端用，走中转向导要先粘 socks5、再建出站和路由，反而绕。这一版在
-+左侧菜单（「入站管理」下面）加了一个独立页面 **一键 Hy2**，只做一件事：
++节点给客户端用，走中转向导要先粘 socks5、再建出站和路由，反而绕。这一版在
++左侧菜单（「入站管理」下面）放了一个独立页面 **一键节点**，只做一件事：
 +
-+> 填几个字段 → 在本机生成 N 个 Hysteria2 入站 + 每个入站上的用户 → 直接把
-+> `hysteria2://` 链接摊出来。
++> 选协议、填几个字段 → 在本机生成 N 个入站 + 每个入站上的用户 → 直接把
++> 节点链接摊出来。
 +
-+- **字段**：节点数量（1-50）、每节点用户数（1-50）、名称前缀、端口（随机 / 指定起始端口）、
-+  节点地址、SNI / 证书域名、TLS 证书（现场自签 / 复用已有）、salamander 混淆。
++- **协议三选一**：`Hysteria2`（QUIC/UDP，自带混淆与暴力提速）/ `Trojan`
++  （经典 TLS 代理，走 TCP）/ `AnyTLS`（TCP/TLS + padding 流量整形）。
++  换协议时名称前缀自动跟着换成 `hy2` / `trojan` / `anytls`。
++- **TLS 三种协议都强制**：hy2 是 QUIC 的固有要求；trojan / anytls 的客户端也按
++  TLS 语义连接，裸跑的链接客户端认不了（后端链接生成在无 TLS 时不会带
++  `security=tls`）。字段：节点数量（1-50）、每节点用户数（1-50）、名称前缀、
++  端口（随机 / 指定起始端口）、节点地址、SNI / 证书域名、TLS 证书（现场自签 /
++  复用已有）；salamander 混淆只在 hysteria2 下显示。
++- **alpn 差异**：只给 hysteria2 两侧写死 `alpn=h3`（QUIC 只跑 h3）；
++  trojan / anytls 留空不写死，免得跟客户端对不上。
++- **用户凭据**：三种协议都按密码认证，`config.hysteria2` / `config.trojan` /
++  `config.anytls` 写 `{name, password}`，`name` 同时是 sing-box 侧的会话/统计标识。
 +- **命名**：入站 tag 用 `前缀` 或 `前缀-序号`（`hy2` → `hy2` / `hy2-1`、`hy2-2`…），
 +  用户名在每节点多用户时再加 `-序号`；与现有 tag / 用户名冲突会自动补 `-1`、`-2`。
 +- **端口**：默认从 10000-60000 挑没被占用的；关掉「随机分配」后从指定端口往后顺延，
 +  跳过已占用的。凑不够数量会直接报错，不会建一半。
 +- **TLS**：一批节点**共用一份**证书（域名相同，签 N 份只会在 TLS 列表里堆垃圾）。
-+  自签那份两侧都写死 `alpn=h3`、客户端带 `insecure`，链接里自动出现 `insecure=1`；
-+  有真证书就选「复用已有配置」，链接里就不会有 insecure。
++  自签那份客户端带 `insecure`，链接里自动出现 `insecure=1`；有真证书就选
++  「复用已有配置」，链接里就不会有 insecure。
 +- **不碰出站和路由**：这里建的节点就是本机直出，适合独立开号；要落地转发请走「中转管理」。
 +- **建完直接看链接**：复用中转的「节点链接」弹窗，按用户分组，可单条复制 / 二维码 /
-+  明文或 Base64 整包复制；页面右侧还列着**已有的全部 hy2 节点**（tag / 端口 / 用户数 /
-+  TLS 是否启用），随时点「链接」重看。
++  明文或 Base64 整包复制；页面右侧还列着**当前协议已有的全部节点**（tag / 端口 /
++  用户数 / TLS 是否启用），随时点「链接」重看。
 +- **不重启核心**：入站与用户的增删都是热加载（核心运行时 `AddInbound` / 加用户），
 +  N 个节点也不会触发 N 次重启。
 +
@@ -717,7 +727,7 @@ diff -ruN
 +
 +| 文件 | 说明 |
 +|---|---|
-+| `src/layouts/default/Drawer.vue` | 菜单项 + 当前管理对象提示（新增「一键 Hy2」入口） |
++| `src/layouts/default/Drawer.vue` | 菜单项 + 当前管理对象提示（新增「一键节点」入口） |
 +| `src/layouts/modals/Client.vue` | 新增 `presetInbounds`：从别处新增用户时预勾入站 |
 +| `src/layouts/modals/ExportLinks.vue` | 新增：导出订阅 URL / 分享链接弹窗 |
 +| `src/layouts/modals/RelayUsers.vue` | 新增：中转用户管理（列表 / 增删改 / 启用 / 二维码） |
@@ -727,12 +737,12 @@ diff -ruN
 +| `src/locales/{en,zhcn,zhtw}.ts` | 新增文案（三份的覆盖范围见 §8） |
 +| `src/plugins/api.ts` | 每个请求注入 `X-Remote-Server` |
 +| `src/plugins/remote.ts` | 新增：当前被管理面板的 id（含持久化） |
-+| `src/router/index.ts` | `/servers`、`/relay`、`/hy2` 路由；启动时拉一次列表 |
++| `src/router/index.ts` | `/servers`、`/relay`、`/quick` 路由；启动时拉一次列表 |
 +| `src/store/modules/data.ts` | servers / currentServer / loadServers / switchServer |
 +| `src/types/servers.ts` | 新增：Server 类型 |
 +| `src/views/Relay.vue` | 新增：中转管理页（每张卡片带测速 / 用户管理 / 节点链接） |
-+| `src/views/Hy2.vue` | 新增：一键 Hy2 页（批量建本机 hy2 入站 + 用户，摊链接；右侧列已有 hy2 节点） |
-+| `src/plugins/naming.ts` | 新增：safeName / currentHost / normalizeHost / remarkOf（中转向导与一键 Hy2 共用） |
++| `src/views/Quick.vue` | 新增：一键节点页（hysteria2 / trojan / anytls 三选一，批量建本机入站 + 用户，摊链接；右侧列当前协议已有节点） |
++| `src/plugins/naming.ts` | 新增：safeName / currentHost / normalizeHost / remarkOf（中转向导与一键节点共用） |
 +| `src/views/Servers.vue` | 新增：服务器列表页 |
 +| `src/views/Settings.vue` | 版本检查 + 一键升级按钮 |
 +
@@ -1450,12 +1460,11 @@ diff -ruN
  }
 diff -ruN
 --- a/config/version	2026-10-15 19:44:34.000000000 +0800
-+++ b/config/version	2026-10-31 11:05:01.340941800 +0800
++++ b/config/version	2026-11-21 23:41:24.561157100 +0800
 @@ -1 +1 @@
 -1.6.5
 \ No newline at end of file
-+1.6.5-mo5
-\ No newline at end of file
++1.6.5-mo6
 diff -ruN
 --- a/database/model/server.go	1970-01-01 08:00:00.000000000 +0800
 +++ b/database/model/server.go	2026-10-23 21:48:02.813731800 +0800

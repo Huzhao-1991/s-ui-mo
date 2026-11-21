@@ -1,5 +1,5 @@
 diff -ruN
---- C:\Users\Administrator\WorkBuddy\2026-10-04-10-51-07\suiwork\x\s-ui-frontend-1.6.5/package-lock.json	2026-10-15 18:53:46.000000000 +0800
+--- a/package-lock.json	2026-10-15 18:53:46.000000000 +0800
 +++ b/package-lock.json	2026-10-23 21:48:03.070045500 +0800
 @@ -505,6 +505,7 @@
        "version": "2.6.0",
@@ -432,7 +432,7 @@ diff -ruN
      },
      "node_modules/unplugin": {
 diff -ruN
---- C:\Users\Administrator\WorkBuddy\2026-10-04-10-51-07\suiwork\x\s-ui-frontend-1.6.5/src/components/Main.vue	2026-10-15 18:53:46.000000000 +0800
+--- a/src/components/Main.vue	2026-10-15 18:53:46.000000000 +0800
 +++ b/src/components/Main.vue	2026-10-23 21:48:03.367250900 +0800
 @@ -49,6 +49,25 @@
                    </v-col>
@@ -517,8 +517,8 @@ diff -ruN
  }
  
 diff -ruN
---- C:\Users\Administrator\WorkBuddy\2026-10-04-10-51-07\suiwork\x\s-ui-frontend-1.6.5/src/layouts/default/Drawer.vue	2026-10-15 18:53:46.000000000 +0800
-+++ b/src/layouts/default/Drawer.vue	2026-10-31 11:00:11.339459600 +0800
+--- a/src/layouts/default/Drawer.vue	2026-10-15 18:53:46.000000000 +0800
++++ b/src/layouts/default/Drawer.vue	2026-11-21 22:20:43.021352400 +0800
 @@ -11,6 +11,8 @@
        height="63"
        prepend-avatar="@/assets/logo.svg"
@@ -552,8 +552,8 @@ diff -ruN
  const menu = [
    { title: 'pages.home', icon: 'mdi-home',  path: '/' },
    { title: 'pages.inbounds', icon: 'mdi-cloud-download',  path: '/inbounds' },
-+  // 一键 Hy2：只建本机 hy2 节点（入站 + 用户 + 链接），不涉及落地
-+  { title: 'pages.hy2', icon: 'mdi-lightning-bolt',  path: '/hy2' },
++  // 一键节点：只建本机 hy2 / trojan / anytls 节点（入站 + 用户 + 链接），不涉及落地
++  { title: 'pages.quick', icon: 'mdi-lightning-bolt',  path: '/quick' },
 +  // 中转管理：与参考魔改版一致，紧挨在入站管理后面
 +  { title: 'pages.relay', icon: 'mdi-transit-connection-variant',  path: '/relay' },
    { title: 'pages.clients', icon: 'mdi-account-multiple',  path: '/clients' },
@@ -565,7 +565,7 @@ diff -ruN
    { title: 'pages.basics', icon: 'mdi-application-cog',  path: '/basics' },
    { title: 'pages.rules', icon: 'mdi-routes',  path: '/rules' },
 diff -ruN
---- C:\Users\Administrator\WorkBuddy\2026-10-04-10-51-07\suiwork\x\s-ui-frontend-1.6.5/src/layouts/modals/Client.vue	2026-10-15 18:53:46.000000000 +0800
+--- a/src/layouts/modals/Client.vue	2026-10-15 18:53:46.000000000 +0800
 +++ b/src/layouts/modals/Client.vue	2026-10-23 21:48:03.150829400 +0800
 @@ -454,6 +454,12 @@
      id: { type: Number, required: true },
@@ -593,7 +593,7 @@ diff -ruN
          this.clientConfig = randomConfigs('client')
        }
 diff -ruN
---- C:\Users\Administrator\WorkBuddy\2026-10-04-10-51-07\suiwork\x\s-ui-frontend-1.6.5/src/layouts/modals/ClientLinks.vue	1970-01-01 08:00:00.000000000 +0800
+--- a/src/layouts/modals/ClientLinks.vue	1970-01-01 08:00:00.000000000 +0800
 +++ b/src/layouts/modals/ClientLinks.vue	2026-10-23 21:48:03.148834500 +0800
 @@ -0,0 +1,205 @@
 +<template>
@@ -802,7 +802,7 @@ diff -ruN
 +}
 +</script>
 diff -ruN
---- C:\Users\Administrator\WorkBuddy\2026-10-04-10-51-07\suiwork\x\s-ui-frontend-1.6.5/src/layouts/modals/ExportLinks.vue	1970-01-01 08:00:00.000000000 +0800
+--- a/src/layouts/modals/ExportLinks.vue	1970-01-01 08:00:00.000000000 +0800
 +++ b/src/layouts/modals/ExportLinks.vue	2026-10-23 21:48:03.140856000 +0800
 @@ -0,0 +1,197 @@
 +<template>
@@ -1003,7 +1003,7 @@ diff -ruN
 +}
 +</script>
 diff -ruN
---- C:\Users\Administrator\WorkBuddy\2026-10-04-10-51-07\suiwork\x\s-ui-frontend-1.6.5/src/layouts/modals/InboundUsers.vue	1970-01-01 08:00:00.000000000 +0800
+--- a/src/layouts/modals/InboundUsers.vue	1970-01-01 08:00:00.000000000 +0800
 +++ b/src/layouts/modals/InboundUsers.vue	2026-10-23 21:48:03.142852100 +0800
 @@ -0,0 +1,468 @@
 +<template>
@@ -1475,7 +1475,7 @@ diff -ruN
 +}
 +</script>
 diff -ruN
---- C:\Users\Administrator\WorkBuddy\2026-10-04-10-51-07\suiwork\x\s-ui-frontend-1.6.5/src/layouts/modals/RelayLinks.vue	1970-01-01 08:00:00.000000000 +0800
+--- a/src/layouts/modals/RelayLinks.vue	1970-01-01 08:00:00.000000000 +0800
 +++ b/src/layouts/modals/RelayLinks.vue	2026-10-31 11:02:11.633399200 +0800
 @@ -0,0 +1,240 @@
 +<template>
@@ -1719,7 +1719,7 @@ diff -ruN
 +}
 +</script>
 diff -ruN
---- C:\Users\Administrator\WorkBuddy\2026-10-04-10-51-07\suiwork\x\s-ui-frontend-1.6.5/src/layouts/modals/RelayUsers.vue	1970-01-01 08:00:00.000000000 +0800
+--- a/src/layouts/modals/RelayUsers.vue	1970-01-01 08:00:00.000000000 +0800
 +++ b/src/layouts/modals/RelayUsers.vue	2026-10-23 21:48:03.144846100 +0800
 @@ -0,0 +1,494 @@
 +<template>
@@ -2217,7 +2217,7 @@ diff -ruN
 +}
 +</script>
 diff -ruN
---- C:\Users\Administrator\WorkBuddy\2026-10-04-10-51-07\suiwork\x\s-ui-frontend-1.6.5/src/layouts/modals/RelayWizard.vue	1970-01-01 08:00:00.000000000 +0800
+--- a/src/layouts/modals/RelayWizard.vue	1970-01-01 08:00:00.000000000 +0800
 +++ b/src/layouts/modals/RelayWizard.vue	2026-10-31 11:02:11.675901400 +0800
 @@ -0,0 +1,959 @@
 +<template>
@@ -3180,7 +3180,7 @@ diff -ruN
 +}
 +</script>
 diff -ruN
---- C:\Users\Administrator\WorkBuddy\2026-10-04-10-51-07\suiwork\x\s-ui-frontend-1.6.5/src/layouts/modals/Server.vue	1970-01-01 08:00:00.000000000 +0800
+--- a/src/layouts/modals/Server.vue	1970-01-01 08:00:00.000000000 +0800
 +++ b/src/layouts/modals/Server.vue	2026-10-23 21:48:03.147837300 +0800
 @@ -0,0 +1,136 @@
 +<template>
@@ -3320,14 +3320,14 @@ diff -ruN
 +}
 +</script>
 diff -ruN
---- C:\Users\Administrator\WorkBuddy\2026-10-04-10-51-07\suiwork\x\s-ui-frontend-1.6.5/src/locales/en.ts	2026-10-15 18:53:46.000000000 +0800
-+++ b/src/locales/en.ts	2026-10-31 11:00:11.439860300 +0800
-@@ -52,6 +52,148 @@
+--- a/src/locales/en.ts	2026-10-15 18:53:46.000000000 +0800
++++ b/src/locales/en.ts	2026-11-21 22:20:43.065236400 +0800
+@@ -52,6 +52,154 @@
      dns: "DNS",
      admins: "Admins",
      settings: "Settings",
 +    relay: "Relay",
-+    hy2: "Quick Hy2",
++    quick: "Quick nodes",
 +    servers: "Servers",
 +  },
 +  relay: {
@@ -3418,15 +3418,21 @@ diff -ruN
 +    plain: "Plain",
 +    base64: "Base64",
 +  },
-+  hy2: {
-+    formTitle: "Quick Hysteria2 node",
-+    formSubtitle: "Fill a few fields and this creates the inbounds and users on this server, then hands you the hysteria2:// links.",
++  quick: {
++    formTitle: "Quick node setup",
++    formSubtitle: "Pick a protocol, fill a few fields, and this creates the inbounds and users on this server, then hands you the links.",
++    protoHy2: "Hysteria2",
++    protoTrojan: "Trojan",
++    protoAnytls: "AnyTLS",
++    protoHint_hysteria2: "QUIC/UDP with built-in obfuscation and bruteforce-friendly speeds; open the node ports for UDP on your firewall.",
++    protoHint_trojan: "Classic TLS proxy over TCP; disguises itself as ordinary HTTPS traffic.",
++    protoHint_anytls: "TCP/TLS with padding-based traffic shaping; harder to fingerprint as TLS-in-TLS.",
 +    count: "Nodes",
 +    countHint: "1-50, each on its own port",
 +    perNode: "Users per node",
 +    perNodeHint: "Each user gets its own password",
 +    prefix: "Name prefix",
-+    prefixHint: "Used for inbound tags and user names, e.g. hy2 → hy2-1 / hy2-2",
++    prefixHint: "Used for inbound tags and user names; conflicts get a numeric suffix",
 +    autoPort: "Pick ports automatically",
 +    autoPortHint: "Random free port in 10000-60000; turn off to allocate sequentially from the start port",
 +    startPort: "Start port",
@@ -3436,25 +3442,25 @@ diff -ruN
 +    sni: "SNI / certificate name",
 +    sniHint: "CN/SAN of the self-signed certificate, also used as the client SNI",
 +    tls: "TLS certificate",
-+    tlsHint: "Self-signed means a fresh cert and insecure=1 in the link; reuse an existing config if you have a real one",
++    tlsHint: "All three protocols require TLS. Self-signed means a fresh cert and insecure=1 in the link; reuse an existing config if you have a real one",
 +    tlsSelfSigned: "Self-signed (recommended, no domain needed)",
 +    obfs: "salamander obfuscation",
 +    obfsHint: "One random password per inbound; the link carries the obfs parameters",
 +    create: "Create",
-+    created: "Created {n} Hysteria2 node(s) and {users} user(s); links are ready.",
++    created: "Created {n} {proto} node(s) and {users} user(s); links are ready.",
 +    fail: "Failed to create: {list}",
 +    noPort: "Not enough free ports — pick another start port or go back to automatic allocation.",
 +    noTls: "Could not generate a TLS certificate. Retry, or reuse an existing certificate config.",
-+    existingTitle: "Existing Hysteria2 nodes",
-+    existingSubtitle: "Tap Links to see every user's hysteria2:// address on that node",
-+    empty: "No Hysteria2 node yet.",
++    existingTitle: "Existing {proto} nodes",
++    existingSubtitle: "Tap Links to see every user's {proto} address on that node",
++    empty: "No {proto} node yet.",
 +    colTag: "Inbound",
 +    colPort: "Port",
 +    colUsers: "Users",
 +    colTls: "TLS",
 +    links: "Links",
-+    linksTitle: "Hysteria2 node links",
-+    linksDesc: "hysteria2:// links grouped by user — copy them or scan the QR code into your client.",
++    linksTitle: "{proto} node links",
++    linksDesc: "{proto} links grouped by user — copy them or scan the QR code into your client.",
 +  },
 +  exportLinks: {
 +    btn: "Export",
@@ -3471,7 +3477,7 @@ diff -ruN
    },
    main: {
      tiles: "Tiles",
-@@ -95,6 +237,8 @@
+@@ -95,6 +243,8 @@
        title: "Usage & Counts",
        totalUsage: "Total Usage",
      },
@@ -3480,7 +3486,7 @@ diff -ruN
    },
    objects: {
      inbound: "Inbound",
-@@ -117,6 +261,7 @@
+@@ -117,6 +267,7 @@
      headers: "Headers",
      key: "Key",
      value: "Value",
@@ -3488,7 +3494,7 @@ diff -ruN
    },
    actions: {
      action: "Action",
-@@ -146,6 +291,29 @@
+@@ -146,6 +297,29 @@
      closeSessions: "Disconnect User",
      moveUp: "Move up",
      moveDown: "Move down",
@@ -3518,7 +3524,7 @@ diff -ruN
    },
    urlTest: {
      custom: "Custom test URL",
-@@ -243,6 +411,20 @@
+@@ -243,6 +417,20 @@
      autoReset: "Auto Reset",
      resetDays: "Reset Days",
      nextReset: "Next Reset",
@@ -3539,7 +3545,7 @@ diff -ruN
    },
    bulk: {
      order: "Order",
-@@ -488,6 +670,13 @@
+@@ -488,6 +676,13 @@
      multiDomain: "Multi Domain",
      remark: "Remark",
      mdOption: "Multi Domain Options",
@@ -3554,14 +3560,14 @@ diff -ruN
    listen: {
      options: "Listen Options",
 diff -ruN
---- C:\Users\Administrator\WorkBuddy\2026-10-04-10-51-07\suiwork\x\s-ui-frontend-1.6.5/src/locales/zhcn.ts	2026-10-15 18:53:46.000000000 +0800
-+++ b/src/locales/zhcn.ts	2026-10-31 11:00:11.470506900 +0800
-@@ -52,6 +52,148 @@
+--- a/src/locales/zhcn.ts	2026-10-15 18:53:46.000000000 +0800
++++ b/src/locales/zhcn.ts	2026-11-21 22:20:43.097698500 +0800
+@@ -52,6 +52,154 @@
      dns: "DNS",
      admins: "管理员",
      settings: "设置",
 +    relay: "中转管理",
-+    hy2: "一键 Hy2",
++    quick: "一键节点",
 +    servers: "服务器",
 +  },
 +  relay: {
@@ -3652,15 +3658,21 @@ diff -ruN
 +    plain: "明文",
 +    base64: "Base64",
 +  },
-+  hy2: {
-+    formTitle: "一键搭建 Hysteria2 节点",
-+    formSubtitle: "填几个字段,直接在本机生成入站 + 用户,并给出 hysteria2:// 链接。",
++  quick: {
++    formTitle: "一键搭建节点",
++    formSubtitle: "选协议、填几个字段,直接在本机生成入站 + 用户,并给出节点链接。",
++    protoHy2: "Hysteria2",
++    protoTrojan: "Trojan",
++    protoAnytls: "AnyTLS",
++    protoHint_hysteria2: "QUIC/UDP,自带混淆与暴力提速;记得在防火墙放行节点端口的 UDP。",
++    protoHint_trojan: "经典 TLS 代理,走 TCP;伪装成正常 HTTPS 流量。",
++    protoHint_anytls: "TCP/TLS + padding 流量整形,对 TLS-in-TLS 检测更有针对性。",
 +    count: "节点数量",
 +    countHint: "1-50 个,每个节点一个独立端口",
 +    perNode: "每节点用户数",
 +    perNodeHint: "每个节点上建几个用户,各有独立密码",
 +    prefix: "名称前缀",
-+    prefixHint: "入站 tag 与用户名都用它,如 hy2 → hy2-1 / hy2-2",
++    prefixHint: "入站 tag 与用户名都用它,冲突会自动补序号",
 +    autoPort: "随机分配端口",
 +    autoPortHint: "从 10000-60000 里挑没被占用的;关掉后可指定起始端口顺序分配",
 +    startPort: "起始端口",
@@ -3670,25 +3682,25 @@ diff -ruN
 +    sni: "SNI / 证书域名",
 +    sniHint: "自签证书的 CN/SAN,同时作为客户端 SNI",
 +    tls: "TLS 证书",
-+    tlsHint: "自签会现场签一张,链接自带 insecure=1;有真证书就复用已有配置",
++    tlsHint: "三种协议都要跑 TLS。自签会现场签一张,链接自带 insecure=1;有真证书就复用已有配置",
 +    tlsSelfSigned: "现场自签(推荐,免域名)",
 +    obfs: "salamander 混淆",
 +    obfsHint: "每个入站一把随机密码,链接自动带 obfs 参数",
 +    create: "一键创建",
-+    created: "已创建 {n} 个 Hysteria2 节点、{users} 个用户,链接已生成。",
++    created: "已创建 {n} 个 {proto} 节点、{users} 个用户,链接已生成。",
 +    fail: "以下节点创建失败: {list}",
 +    noPort: "没有足够的空闲端口,换个起始端口或改回随机分配。",
 +    noTls: "生成 TLS 证书失败,请稍后重试或改用已有证书配置。",
-+    existingTitle: "已有 Hysteria2 节点",
-+    existingSubtitle: "点「链接」查看该节点上每个用户的 hysteria2:// 地址",
-+    empty: "还没有 Hysteria2 节点。",
++    existingTitle: "已有 {proto} 节点",
++    existingSubtitle: "点「链接」查看该节点上每个用户的 {proto} 地址",
++    empty: "还没有 {proto} 节点。",
 +    colTag: "入站",
 +    colPort: "端口",
 +    colUsers: "用户",
 +    colTls: "TLS",
 +    links: "链接",
-+    linksTitle: "Hysteria2 节点链接",
-+    linksDesc: "按用户列出 hysteria2:// 链接,可直接复制或扫码导入客户端。",
++    linksTitle: "{proto} 节点链接",
++    linksDesc: "按用户列出 {proto} 链接,可直接复制或扫码导入客户端。",
 +  },
 +  exportLinks: {
 +    btn: "导出",
@@ -3705,7 +3717,7 @@ diff -ruN
    },
    main: {
      tiles: "信息卡",
-@@ -95,6 +237,8 @@
+@@ -95,6 +243,8 @@
        title: "使用量与统计",
        totalUsage: "总用量",
      },
@@ -3714,7 +3726,7 @@ diff -ruN
    },
    objects: {
      inbound: "入站",
-@@ -117,6 +261,7 @@
+@@ -117,6 +267,7 @@
      headers: "标头",
      key: "键",
      value: "值",
@@ -3722,7 +3734,7 @@ diff -ruN
    },
    actions: {
      action: "操作",
-@@ -146,6 +291,29 @@
+@@ -146,6 +297,29 @@
      closeSessions: "断开该用户",
      moveUp: "上移",
      moveDown: "下移",
@@ -3752,7 +3764,7 @@ diff -ruN
    },
    urlTest: {
      custom: "自定义测试 URL",
-@@ -243,6 +411,20 @@
+@@ -243,6 +417,20 @@
      autoReset: "自动重置",
      resetDays: "重置天数",
      nextReset: "下次重置",
@@ -3773,7 +3785,7 @@ diff -ruN
    },
    bulk: {
      order: "排序",
-@@ -488,6 +670,13 @@
+@@ -488,6 +676,13 @@
      multiDomain: "多域名",
      remark: "备注",
      mdOption: "多域名选项",
@@ -3788,7 +3800,7 @@ diff -ruN
    listen: {
      options: "监听选项",
 diff -ruN
---- C:\Users\Administrator\WorkBuddy\2026-10-04-10-51-07\suiwork\x\s-ui-frontend-1.6.5/src/locales/zhtw.ts	2026-10-15 18:53:46.000000000 +0800
+--- a/src/locales/zhtw.ts	2026-10-15 18:53:46.000000000 +0800
 +++ b/src/locales/zhtw.ts	2026-10-23 21:48:03.170777600 +0800
 @@ -52,6 +52,7 @@
      dns: "DNS",
@@ -3837,7 +3849,7 @@ diff -ruN
    urlTest: {
      custom: "自訂測試 URL",
 diff -ruN
---- C:\Users\Administrator\WorkBuddy\2026-10-04-10-51-07\suiwork\x\s-ui-frontend-1.6.5/src/plugins/api.ts	2026-10-15 18:53:46.000000000 +0800
+--- a/src/plugins/api.ts	2026-10-15 18:53:46.000000000 +0800
 +++ b/src/plugins/api.ts	2026-10-23 21:48:03.187730800 +0800
 @@ -1,5 +1,6 @@
  import axios from 'axios'
@@ -3865,7 +3877,7 @@ diff -ruN
      },
      (error) => Promise.reject(error),
 diff -ruN
---- C:\Users\Administrator\WorkBuddy\2026-10-04-10-51-07\suiwork\x\s-ui-frontend-1.6.5/src/plugins/httputil.ts	2026-10-15 18:53:46.000000000 +0800
+--- a/src/plugins/httputil.ts	2026-10-15 18:53:46.000000000 +0800
 +++ b/src/plugins/httputil.ts	2026-10-23 21:48:53.925693200 +0800
 @@ -1,4 +1,5 @@
  import api from './api'
@@ -3901,7 +3913,7 @@ diff -ruN
          if (_sessionExpired(err?.response?.status, err?.response?.data?.msg)) {
              push.error({ title: i18n.global.t('invalidLogin') })
 diff -ruN
---- C:\Users\Administrator\WorkBuddy\2026-10-04-10-51-07\suiwork\x\s-ui-frontend-1.6.5/src/plugins/naming.ts	1970-01-01 08:00:00.000000000 +0800
+--- a/src/plugins/naming.ts	1970-01-01 08:00:00.000000000 +0800
 +++ b/src/plugins/naming.ts	2026-10-31 11:02:11.585509600 +0800
 @@ -0,0 +1,38 @@
 +// 建入站 / 建用户时共用的几个命名小工具。
@@ -3943,7 +3955,7 @@ diff -ruN
 +  return safeName(remark)
 +}
 diff -ruN
---- C:\Users\Administrator\WorkBuddy\2026-10-04-10-51-07\suiwork\x\s-ui-frontend-1.6.5/src/plugins/remote.ts	1970-01-01 08:00:00.000000000 +0800
+--- a/src/plugins/remote.ts	1970-01-01 08:00:00.000000000 +0800
 +++ b/src/plugins/remote.ts	2026-10-23 21:48:03.189725500 +0800
 @@ -0,0 +1,26 @@
 +// Which panel the UI is currently driving. Empty means "the one that served
@@ -3973,16 +3985,16 @@ diff -ruN
 +  return current
 +}
 diff -ruN
---- C:\Users\Administrator\WorkBuddy\2026-10-04-10-51-07\suiwork\x\s-ui-frontend-1.6.5/src/router/index.ts	2026-10-15 18:53:46.000000000 +0800
-+++ b/src/router/index.ts	2026-10-31 11:00:11.395825400 +0800
+--- a/src/router/index.ts	2026-10-15 18:53:46.000000000 +0800
++++ b/src/router/index.ts	2026-11-21 22:20:42.989824400 +0800
 @@ -26,6 +26,19 @@
          component: () => import('@/views/Inbounds.vue'),
        },
        {
-+        // 一键 Hy2：只建本机 hy2 入站 + 用户，不碰出站与路由。
-+        path: '/hy2',
-+        name: 'pages.hy2',
-+        component: () => import('@/views/Hy2.vue'),
++        // 一键节点：只建本机 hysteria2 / trojan / anytls 入站 + 用户，不碰出站与路由。
++        path: '/quick',
++        name: 'pages.quick',
++        component: () => import('@/views/Quick.vue'),
 +      },
 +      {
 +        // 中转管理：把入口入站的流量经落地节点转发出去。
@@ -4019,7 +4031,7 @@ diff -ruN
      Data().loadData()
    }, 10000)
 diff -ruN
---- C:\Users\Administrator\WorkBuddy\2026-10-04-10-51-07\suiwork\x\s-ui-frontend-1.6.5/src/store/modules/data.ts	2026-10-15 18:53:46.000000000 +0800
+--- a/src/store/modules/data.ts	2026-10-15 18:53:46.000000000 +0800
 +++ b/src/store/modules/data.ts	2026-10-23 21:48:03.197704500 +0800
 @@ -9,6 +9,8 @@
  import { Endpoint } from '@/types/endpoints'
@@ -4107,7 +4119,7 @@ diff -ruN
      async loadInbounds(ids: number[]): Promise<Inbound[]> {
        const options = ids.length > 0 ? {id: ids.join(",")} : {}
 diff -ruN
---- C:\Users\Administrator\WorkBuddy\2026-10-04-10-51-07\suiwork\x\s-ui-frontend-1.6.5/src/types/servers.ts	1970-01-01 08:00:00.000000000 +0800
+--- a/src/types/servers.ts	1970-01-01 08:00:00.000000000 +0800
 +++ b/src/types/servers.ts	2026-10-23 21:48:03.226627500 +0800
 @@ -0,0 +1,10 @@
 +// A saved panel address — one row of the launcher, mirroring
@@ -4121,7 +4133,7 @@ diff -ruN
 +  remark?: string
 +}
 diff -ruN
---- C:\Users\Administrator\WorkBuddy\2026-10-04-10-51-07\suiwork\x\s-ui-frontend-1.6.5/src/views/Clients.vue	2026-10-15 18:53:46.000000000 +0800
+--- a/src/views/Clients.vue	2026-10-15 18:53:46.000000000 +0800
 +++ b/src/views/Clients.vue	2026-10-23 21:48:03.244578600 +0800
 @@ -42,6 +42,49 @@
      :tag="sessions.tag"
@@ -4314,485 +4326,7 @@ diff -ruN
    let filteredClients = clients.value.slice()
    if (filterSettings.value.group != '-') {
 diff -ruN
---- C:\Users\Administrator\WorkBuddy\2026-10-04-10-51-07\suiwork\x\s-ui-frontend-1.6.5/src/views/Hy2.vue	1970-01-01 08:00:00.000000000 +0800
-+++ b/src/views/Hy2.vue	2026-10-31 11:02:11.547355900 +0800
-@@ -0,0 +1,474 @@
-+<template>
-+  <!-- ======================================================================
-+    一键搭建 Hysteria2 节点（Hy2）
-+    --------------------------------------------------------------------
-+    面板左侧菜单里的独立入口，做的事很单一：填几个字段，直接在本机生成
-+    N 个 Hysteria2 入站 + 每个入站上的用户，然后把 hysteria2:// 链接摊出来。
-+
-+    与「中转管理」的区别：那边是「入口 + 住宅 socks5 落地」，要出站和路由规则；
-+    这边不碰出站、不写路由，建出来的就是本机直出的普通节点 —— 适合
-+    「手上有一台 VPS，想赶紧开几个 hy2 节点给客户端用」的场景。
-+
-+    后端不需要任何新接口，全部复用：
-+      - api/keypairs?k=tls&o=<SNI>   现场签自签证书（要证书就用，不要就复用已有 TLS）
-+      - api/save object=tls          保存自签证书配置
-+      - api/save object=inbounds     建入站
-+      - api/save object=clients      addbulk 一次建完一个入站上的全部用户
-+      - api/clients?id=…             取带 links 的完整客户端行（链接弹窗用）
-+
-+    端口：默认从 10000-60000 随机挑没被占用的；也可以指定起始端口顺序分配。
-+    TLS：hy2 必须跑 TLS。自签那份客户端侧带 insecure，链接里会自动出现
-+    insecure=1；服务端与客户端两侧都写死 alpn=h3（QUIC 只跑 h3）。
-+    ====================================================================== -->
-+  <RelayLinks
-+    :visible="links.visible"
-+    :inbound-tags="links.tags"
-+    :title="links.title"
-+    :heading="$t('hy2.linksTitle')"
-+    :desc="$t('hy2.linksDesc')"
-+    @close="links.visible = false"
-+  />
-+
-+  <v-row>
-+    <!-- 左：创建表单 -->
-+    <v-col cols="12" md="5">
-+      <v-card rounded="xl" elevation="3" :title="$t('hy2.formTitle')" :subtitle="$t('hy2.formSubtitle')">
-+        <v-card-text>
-+          <v-row dense>
-+            <v-col cols="6">
-+              <v-text-field
-+                v-model.number="form.count"
-+                type="number"
-+                min="1"
-+                max="50"
-+                :label="$t('hy2.count')"
-+                :hint="$t('hy2.countHint')"
-+                persistent-hint
-+              />
-+            </v-col>
-+            <v-col cols="6">
-+              <v-text-field
-+                v-model.number="form.perNode"
-+                type="number"
-+                min="1"
-+                max="50"
-+                :label="$t('hy2.perNode')"
-+                :hint="$t('hy2.perNodeHint')"
-+                persistent-hint
-+              />
-+            </v-col>
-+            <v-col cols="12">
-+              <v-text-field
-+                v-model="form.prefix"
-+                :label="$t('hy2.prefix')"
-+                :hint="$t('hy2.prefixHint')"
-+                persistent-hint
-+                placeholder="hy2"
-+              />
-+            </v-col>
-+            <v-col cols="12">
-+              <v-switch
-+                v-model="form.autoPort"
-+                :label="$t('hy2.autoPort')"
-+                :hint="$t('hy2.autoPortHint')"
-+                persistent-hint
-+                color="primary"
-+                density="compact"
-+                hide-details="auto"
-+              />
-+            </v-col>
-+            <v-col v-if="!form.autoPort" cols="12">
-+              <v-text-field
-+                v-model.number="form.startPort"
-+                type="number"
-+                min="1"
-+                max="65535"
-+                :label="$t('hy2.startPort')"
-+                :hint="$t('hy2.startPortHint')"
-+                persistent-hint
-+              />
-+            </v-col>
-+            <v-col cols="12">
-+              <v-text-field
-+                v-model="form.address"
-+                :label="$t('hy2.address')"
-+                :hint="$t('hy2.addressHint')"
-+                persistent-hint
-+                :placeholder="defaultHost"
-+              />
-+            </v-col>
-+            <v-col cols="12">
-+              <v-text-field
-+                v-model="form.sni"
-+                :label="$t('hy2.sni')"
-+                :hint="$t('hy2.sniHint')"
-+                persistent-hint
-+                :placeholder="defaultHost"
-+              />
-+            </v-col>
-+            <v-col cols="12">
-+              <v-select
-+                v-model="form.tlsId"
-+                :items="tlsOptions"
-+                :label="$t('hy2.tls')"
-+                :hint="$t('hy2.tlsHint')"
-+                persistent-hint
-+              />
-+            </v-col>
-+            <v-col cols="12">
-+              <v-switch
-+                v-model="form.obfs"
-+                :label="$t('hy2.obfs')"
-+                :hint="$t('hy2.obfsHint')"
-+                persistent-hint
-+                color="primary"
-+                density="compact"
-+                hide-details="auto"
-+              />
-+            </v-col>
-+          </v-row>
-+
-+          <v-alert v-if="result" :type="result.ok ? 'success' : 'warning'" density="compact" variant="tonal" class="mt-4">
-+            {{ result.text }}
-+          </v-alert>
-+        </v-card-text>
-+        <v-card-actions>
-+          <v-spacer />
-+          <v-btn
-+            color="primary"
-+            variant="tonal"
-+            prepend-icon="mdi-flash"
-+            :loading="loading"
-+            @click="create"
-+          >
-+            {{ $t('hy2.create') }}
-+          </v-btn>
-+        </v-card-actions>
-+      </v-card>
-+    </v-col>
-+
-+    <!-- 右：已有的 hy2 节点，随时能再看链接 -->
-+    <v-col cols="12" md="7">
-+      <v-card rounded="xl" elevation="3" :title="$t('hy2.existingTitle')" :subtitle="$t('hy2.existingSubtitle')">
-+        <v-card-text>
-+          <div v-if="rows.length === 0" style="text-align: center; opacity: 0.6; padding: 28px;">
-+            {{ $t('hy2.empty') }}
-+          </div>
-+          <v-table v-else density="compact">
-+            <thead>
-+              <tr>
-+                <th>{{ $t('hy2.colTag') }}</th>
-+                <th>{{ $t('hy2.colPort') }}</th>
-+                <th>{{ $t('hy2.colUsers') }}</th>
-+                <th>{{ $t('hy2.colTls') }}</th>
-+                <th />
-+              </tr>
-+            </thead>
-+            <tbody>
-+              <tr v-for="r in rows" :key="r.id">
-+                <td>{{ r.tag }}</td>
-+                <td>{{ r.port }}</td>
-+                <td>{{ r.users }}</td>
-+                <td>{{ r.tls }}</td>
-+                <td style="text-align: end;">
-+                  <v-btn
-+                    size="small"
-+                    variant="text"
-+                    color="primary"
-+                    prepend-icon="mdi-link-variant"
-+                    @click="openLinks([r.tag], r.tag)"
-+                  >
-+                    {{ $t('hy2.links') }}
-+                  </v-btn>
-+                </td>
-+              </tr>
-+            </tbody>
-+          </v-table>
-+        </v-card-text>
-+      </v-card>
-+    </v-col>
-+  </v-row>
-+</template>
-+
-+<script lang="ts">
-+import Data from '@/store/modules/data'
-+import HttpUtils from '@/plugins/httputil'
-+import RandomUtil from '@/plugins/randomUtil'
-+import { i18n } from '@/locales'
-+import { push } from 'notivue'
-+import { InTypes, createInbound } from '@/types/inbounds'
-+import { createClient } from '@/types/clients'
-+import RelayLinks from '@/layouts/modals/RelayLinks.vue'
-+import { currentHost, normalizeHost, safeName } from '@/plugins/naming'
-+
-+// 端口随机范围，与「入站管理」页新建入站、「中转向导」用的是同一段。
-+const PORT_MIN = 10000
-+const PORT_MAX = 60000
-+
-+// hy2 的 QUIC 只跑 h3，TLS 两侧都显式写上，省得依赖 sing-box 的默认值。
-+const HY2_ALPN = ['h3']
-+
-+export default {
-+  components: { RelayLinks },
-+  data() {
-+    return {
-+      loading: false,
-+      result: <any>null,
-+      form: {
-+        count: 1,          // 建几个节点
-+        perNode: 1,        // 每个节点上几个用户
-+        prefix: 'hy2',     // tag / 用户名的前缀
-+        autoPort: true,    // true = 随机挑空闲端口；false = 从 startPort 顺序分配
-+        startPort: 20000,
-+        address: '',       // 写进入站 addrs，链接里就用它；留空回退到面板域名
-+        sni: '',           // 自签证书的域名，同时作为客户端 SNI
-+        tlsId: 0,          // 0 = 现场自签；>0 = 复用已有证书配置
-+        obfs: false,       // salamander 混淆
-+      },
-+      links: {
-+        visible: false,
-+        tags: <string[]>[],
-+        title: '',
-+      },
-+    }
-+  },
-+  computed: {
-+    defaultHost(): string {
-+      return currentHost()
-+    },
-+    // TLS 下拉：只列带服务端证书的配置（certificate / path / provider 任一），
-+    // 第一条永远是「现场自签」。reality 配置在这条链路上用不了，不列。
-+    tlsOptions(): { title: string, value: number }[] {
-+      const opts = (Data().tlsConfigs || [])
-+        .filter((t: any) => t.server?.enabled && (
-+          (Array.isArray(t.server?.certificate) && t.server.certificate.length > 0) ||
-+          t.server?.certificate_path ||
-+          t.server?.certificate_provider
-+        ))
-+        .map((t: any) => ({ title: t.name, value: t.id }))
-+      return [{ title: i18n.global.t('hy2.tlsSelfSigned'), value: 0 }, ...opts]
-+    },
-+    // 已有 hy2 入站列表：按端口排序，用户数从客户端表里数出来。
-+    rows(): { id: number, tag: string, port: number, users: number, tls: string }[] {
-+      const clients = Data().clients || []
-+      return (Data().inbounds || [])
-+        .filter((i: any) => i.type === InTypes.Hysteria2)
-+        .map((i: any) => ({
-+          id: i.id,
-+          tag: i.tag,
-+          port: i.listen_port,
-+          users: clients.filter((c: any) => Array.isArray(c.inbounds) && c.inbounds.includes(i.id)).length,
-+          tls: i.tls_id > 0 ? i18n.global.t('enable') : i18n.global.t('disable'),
-+        }))
-+        .sort((a: any, b: any) => (a.port || 0) - (b.port || 0))
-+    },
-+  },
-+  methods: {
-+    openLinks(tags: string[], title: string) {
-+      this.links.tags = tags
-+      this.links.title = title
-+      this.links.visible = true
-+    },
-+    // -----------------------------------------------------------------
-+    // 端口分配。同一批里也不能重复，所以每个取完就记进集合。
-+    // 随机模式最多试 300×N 次；手动模式从起始端口往上找空位。
-+    // 返回的数组长度不足 count 就说明没有足够端口，调用方直接中止。
-+    // -----------------------------------------------------------------
-+    allocPorts(count: number): number[] {
-+      const used = new Set<number>(
-+        (Data().inbounds || [])
-+          .map((i: any) => i.listen_port)
-+          .filter((p: any) => Number.isInteger(p))
-+      )
-+      const ports: number[] = []
-+      if (this.form.autoPort) {
-+        for (let attempt = 0; attempt < 300 * count && ports.length < count; attempt++) {
-+          const port = RandomUtil.randomIntRange(PORT_MIN, PORT_MAX)
-+          if (used.has(port)) continue
-+          used.add(port)
-+          ports.push(port)
-+        }
-+        return ports
-+      }
-+      let port = Math.floor(this.form.startPort) || PORT_MIN
-+      while (ports.length < count && port <= 65535) {
-+        if (!used.has(port)) {
-+          used.add(port)
-+          ports.push(port)
-+        }
-+        port++
-+      }
-+      return ports
-+    },
-+    makeTagPicker(): (base: string) => string {
-+      const used = new Set<string>([
-+        ...(Data().outbounds || []).map((o: any) => o.tag),
-+        ...(Data().endpoints || []).map((e: any) => e.tag),
-+        ...(Data().inbounds || []).map((i: any) => i.tag),
-+      ])
-+      return (base: string) => {
-+        let tag = base
-+        let n = 1
-+        while (used.has(tag)) tag = base + '-' + (n++)
-+        used.add(tag)
-+        return tag
-+      }
-+    },
-+    // -----------------------------------------------------------------
-+    // TLS：选了已有配置就复用；否则现场签一张自签证书。
-+    // 一批节点共用同一份证书 —— 域名一样，签 N 份只会在 TLS 列表里堆垃圾。
-+    // 自签的客户端侧带 insecure: true，后端 LinkGenerator 会写成 insecure=1。
-+    // -----------------------------------------------------------------
-+    async ensureTls(prefix: string): Promise<number> {
-+      if (this.form.tlsId > 0) return this.form.tlsId
-+
-+      const sni = normalizeHost(this.form.sni) || currentHost() || 'www.bing.com'
-+      const msg = await HttpUtils.get<string[]>('api/keypairs', { k: 'tls', o: sni })
-+      if (!msg.success || !Array.isArray(msg.obj) || msg.obj.length == 0) {
-+        push.error({ message: i18n.global.t('hy2.noTls') })
-+        return 0
-+      }
-+      // 后端一次性给出「私钥 PEM + 证书 PEM」，按 BEGIN/END 标记切开。
-+      const key: string[] = []
-+      const cert: string[] = []
-+      let mode = ''
-+      msg.obj.forEach((line: string) => {
-+        if (line === '-----BEGIN PRIVATE KEY-----') { mode = 'key'; key.push(line) }
-+        else if (line === '-----END PRIVATE KEY-----') { key.push(line); mode = '' }
-+        else if (line === '-----BEGIN CERTIFICATE-----') { mode = 'cert'; cert.push(line) }
-+        else if (line === '-----END CERTIFICATE-----') { cert.push(line); mode = '' }
-+        else if (mode === 'key') key.push(line)
-+        else if (mode === 'cert') cert.push(line)
-+      })
-+      if (key.length == 0 || cert.length == 0) {
-+        push.error({ message: i18n.global.t('hy2.noTls') })
-+        return 0
-+      }
-+
-+      const tlsName = prefix + '-hy2-' + RandomUtil.randomLowerAndNum(4)
-+      const tls = {
-+        id: 0,
-+        name: tlsName,
-+        server: {
-+          enabled: true,
-+          server_name: sni,
-+          alpn: HY2_ALPN,
-+          certificate: cert,
-+          key: key,
-+        },
-+        client: {
-+          alpn: HY2_ALPN,
-+          // 自签证书只能靠 insecure 过，链接里会带 insecure=1
-+          insecure: true,
-+        },
-+      }
-+      if (!await Data().save('tls', 'new', tls)) return 0
-+      const saved = (Data().tlsConfigs || []).find((t: any) => t.name == tlsName)
-+      if (!saved?.id) {
-+        push.error({ message: i18n.global.t('hy2.noTls') })
-+        return 0
-+      }
-+      return saved.id
-+    },
-+    // -----------------------------------------------------------------
-+    // 一键创建：端口 → TLS → 逐个入站 → 每个入站的用户（addbulk）。
-+    // 用户凭据是 config.hysteria2 = {name, password}：hy2 按密码认证，
-+    // name 同时是 sing-box 侧的会话/统计标识，缺了流量统计会是空白。
-+    // -----------------------------------------------------------------
-+    async create() {
-+      const count = Math.min(Math.max(Math.floor(this.form.count) || 1, 1), 50)
-+      const perNode = Math.min(Math.max(Math.floor(this.form.perNode) || 1, 1), 50)
-+      const prefix = safeName(this.form.prefix) || 'hy2'
-+
-+      const ports = this.allocPorts(count)
-+      if (ports.length < count) {
-+        push.error({ message: i18n.global.t('hy2.noPort') })
-+        return
-+      }
-+
-+      this.loading = true
-+      this.result = null
-+      try {
-+        const tlsId = await this.ensureTls(prefix)
-+        if (!tlsId) return
-+
-+        const pickTag = this.makeTagPicker()
-+        const addr = normalizeHost(this.form.address)
-+        const takenNames = new Set<string>((Data().clients || []).map((c: any) => c.name))
-+        const tags: string[] = []
-+        const failed: string[] = []
-+        let users = 0
-+
-+        for (let i = 0; i < count; i++) {
-+          const base = count == 1 ? prefix : prefix + '-' + (i + 1)
-+          const tag = pickTag(base)
-+          const port = ports[i]
-+
-+          // 1) 入站。addrs / out_json 是「入站管理」页新建时也会带的字段，
-+          //    缺了它们客户端链接就拼不出来。
-+          const inbound: any = createInbound(InTypes.Hysteria2, {
-+            id: 0, tag, listen: '::', listen_port: port, tls_id: tlsId,
-+          })
-+          if (this.form.obfs) {
-+            // 每个入站一把混淆密码，链接里会带 obfs=salamander&obfs-password=...
-+            inbound.obfs = { type: 'salamander', password: RandomUtil.randomSeq(16) }
-+          }
-+          inbound.addrs = addr ? [{ server: addr, server_port: port, remark: '' }] : []
-+          inbound.out_json = {}
-+          if (!await Data().save('inbounds', 'new', inbound)) {
-+            failed.push(base)
-+            continue
-+          }
-+          const savedInbound = (Data().inbounds || []).find((x: any) => x.tag == tag)
-+          if (!savedInbound?.id) {
-+            failed.push(base)
-+            continue
-+          }
-+
-+          // 2) 用户。名字重复就加序号，不然 addbulk 会因重名整批失败。
-+          const clients: any[] = []
-+          for (let u = 0; u < perNode; u++) {
-+            let userName = perNode == 1 ? base : base + '-' + (u + 1)
-+            let seq = 1
-+            while (takenNames.has(userName)) userName = (perNode == 1 ? base : base + '-' + (u + 1)) + '-' + (seq++)
-+            takenNames.add(userName)
-+
-+            const client: any = createClient({ name: userName, inbounds: [savedInbound.id] })
-+            const cfg = client.config || {}
-+            cfg.hysteria2 = { name: userName, password: RandomUtil.randomSeq(16) }
-+            client.config = cfg
-+            clients.push(client)
-+          }
-+          // addbulk：一个节点的用户整批一次提交，别一个个存。
-+          if (!await Data().save('clients', 'addbulk', clients)) {
-+            failed.push(base)
-+            continue
-+          }
-+
-+          users += clients.length
-+          tags.push(tag)
-+        }
-+
-+        if (tags.length === 0) {
-+          this.result = { ok: false, text: i18n.global.t('hy2.fail', { list: failed.join(', ') }) }
-+          push.error({ message: this.result.text })
-+          return
-+        }
-+
-+        const done = i18n.global.t('hy2.created', { n: tags.length, users })
-+        this.result = failed.length == 0
-+          ? { ok: true, text: done }
-+          : { ok: false, text: done + ' / ' + i18n.global.t('hy2.fail', { list: failed.join(', ') }) }
-+        push.success({ title: i18n.global.t('success'), message: done })
-+
-+        // 3) 建完直接把链接摊出来（复制 / 二维码 / Base64 整包）。
-+        this.openLinks(tags, prefix)
-+      } catch (e: any) {
-+        push.error({ message: i18n.global.t('error.invalidData') + ': ' + (e?.toString() ?? '') })
-+      } finally {
-+        this.loading = false
-+      }
-+    },
-+  },
-+}
-+</script>
-diff -ruN
---- C:\Users\Administrator\WorkBuddy\2026-10-04-10-51-07\suiwork\x\s-ui-frontend-1.6.5/src/views/Inbounds.vue	2026-10-15 18:53:46.000000000 +0800
+--- a/src/views/Inbounds.vue	2026-10-15 18:53:46.000000000 +0800
 +++ b/src/views/Inbounds.vue	2026-10-23 21:48:03.249567500 +0800
 @@ -1,5 +1,18 @@
  <template>
@@ -5330,7 +4864,539 @@ diff -ruN
 +]
 +</script>
 diff -ruN
---- C:\Users\Administrator\WorkBuddy\2026-10-04-10-51-07\suiwork\x\s-ui-frontend-1.6.5/src/views/Relay.vue	1970-01-01 08:00:00.000000000 +0800
+--- a/src/views/Quick.vue	1970-01-01 08:00:00.000000000 +0800
++++ b/src/views/Quick.vue	2026-11-21 22:20:42.936909100 +0800
+@@ -0,0 +1,528 @@
++<template>
++  <!-- ======================================================================
++    一键搭建节点（Hysteria2 / Trojan / AnyTLS）
++    --------------------------------------------------------------------
++    面板左侧菜单里的独立入口，做的事很单一：选协议、填几个字段，直接在本机
++    生成 N 个入站 + 每个入站上的用户，然后把节点链接摊出来。
++
++    与「中转管理」的区别：那边是「入口 + 住宅 socks5 落地」，要出站和路由规则；
++    这边不碰出站、不写路由，建出来的就是本机直出的普通节点 —— 适合
++    「手上有一台 VPS，想赶紧开几个节点给客户端用」的场景。
++
++    三种协议的共同点：都必须跑 TLS（hy2 是 QUIC 固有要求；trojan / anytls
++    的客户端也按 TLS 语义连接，裸跑的链接客户端认不了），所以 TLS 字段共用，
++    自签那份客户端侧带 insecure，链接里会自动出现 insecure=1。
++
++    差异点：
++      - hysteria2 跑 QUIC/UDP，TLS 两侧写死 alpn=h3；可选 salamander 混淆
++      - trojan / anytls 跑 TCP/TLS，alpn 留空不写死；没有混淆的概念
++      - anytls 入站自带 padding_scheme（sing-anytls 的默认流量整形）
++
++    后端不需要任何新接口，全部复用：
++      - api/keypairs?k=tls&o=<SNI>   现场签自签证书（要证书就用，不要就复用已有 TLS）
++      - api/save object=tls          保存自签证书配置
++      - api/save object=inbounds     建入站
++      - api/save object=clients      addbulk 一次建完一个入站上的全部用户
++      - api/clients?id=…             取带 links 的完整客户端行（链接弹窗用）
++      - util/genLink.go              链接生成（hysteria2:// / trojan:// / anytls://）
++
++    端口：默认从 10000-60000 随机挑没被占用的；也可以指定起始端口顺序分配。
++    ====================================================================== -->
++  <RelayLinks
++    :visible="links.visible"
++    :inbound-tags="links.tags"
++    :title="links.title"
++    :heading="$t('quick.linksTitle', { proto: protoName })"
++    :desc="$t('quick.linksDesc', { proto: protoName })"
++    @close="links.visible = false"
++  />
++
++  <v-row>
++    <!-- 左：创建表单 -->
++    <v-col cols="12" md="5">
++      <v-card rounded="xl" elevation="3" :title="$t('quick.formTitle')" :subtitle="$t('quick.formSubtitle')">
++        <v-card-text>
++          <v-row dense>
++            <v-col cols="12">
++              <v-btn-toggle v-model="form.protocol" mandatory color="primary" density="compact">
++                <v-btn value="hysteria2" size="small">{{ $t('quick.protoHy2') }}</v-btn>
++                <v-btn value="trojan" size="small">{{ $t('quick.protoTrojan') }}</v-btn>
++                <v-btn value="anytls" size="small">{{ $t('quick.protoAnytls') }}</v-btn>
++              </v-btn-toggle>
++              <p style="font-size: 0.78rem; opacity: 0.75; margin-top: 6px;">
++                {{ $t('quick.protoHint_' + form.protocol) }}
++              </p>
++            </v-col>
++            <v-col cols="6">
++              <v-text-field
++                v-model.number="form.count"
++                type="number"
++                min="1"
++                max="50"
++                :label="$t('quick.count')"
++                :hint="$t('quick.countHint')"
++                persistent-hint
++              />
++            </v-col>
++            <v-col cols="6">
++              <v-text-field
++                v-model.number="form.perNode"
++                type="number"
++                min="1"
++                max="50"
++                :label="$t('quick.perNode')"
++                :hint="$t('quick.perNodeHint')"
++                persistent-hint
++              />
++            </v-col>
++            <v-col cols="12">
++              <v-text-field
++                v-model="form.prefix"
++                :label="$t('quick.prefix')"
++                :hint="$t('quick.prefixHint')"
++                persistent-hint
++                :placeholder="form.protocol"
++              />
++            </v-col>
++            <v-col cols="12">
++              <v-switch
++                v-model="form.autoPort"
++                :label="$t('quick.autoPort')"
++                :hint="$t('quick.autoPortHint')"
++                persistent-hint
++                color="primary"
++                density="compact"
++                hide-details="auto"
++              />
++            </v-col>
++            <v-col v-if="!form.autoPort" cols="12">
++              <v-text-field
++                v-model.number="form.startPort"
++                type="number"
++                min="1"
++                max="65535"
++                :label="$t('quick.startPort')"
++                :hint="$t('quick.startPortHint')"
++                persistent-hint
++              />
++            </v-col>
++            <v-col cols="12">
++              <v-text-field
++                v-model="form.address"
++                :label="$t('quick.address')"
++                :hint="$t('quick.addressHint')"
++                persistent-hint
++                :placeholder="defaultHost"
++              />
++            </v-col>
++            <v-col cols="12">
++              <v-text-field
++                v-model="form.sni"
++                :label="$t('quick.sni')"
++                :hint="$t('quick.sniHint')"
++                persistent-hint
++                :placeholder="defaultHost"
++              />
++            </v-col>
++            <v-col cols="12">
++              <v-select
++                v-model="form.tlsId"
++                :items="tlsOptions"
++                :label="$t('quick.tls')"
++                :hint="$t('quick.tlsHint')"
++                persistent-hint
++              />
++            </v-col>
++            <v-col v-if="form.protocol === 'hysteria2'" cols="12">
++              <v-switch
++                v-model="form.obfs"
++                :label="$t('quick.obfs')"
++                :hint="$t('quick.obfsHint')"
++                persistent-hint
++                color="primary"
++                density="compact"
++                hide-details="auto"
++              />
++            </v-col>
++          </v-row>
++
++          <v-alert v-if="result" :type="result.ok ? 'success' : 'warning'" density="compact" variant="tonal" class="mt-4">
++            {{ result.text }}
++          </v-alert>
++        </v-card-text>
++        <v-card-actions>
++          <v-spacer />
++          <v-btn
++            color="primary"
++            variant="tonal"
++            prepend-icon="mdi-flash"
++            :loading="loading"
++            @click="create"
++          >
++            {{ $t('quick.create') }}
++          </v-btn>
++        </v-card-actions>
++      </v-card>
++    </v-col>
++
++    <!-- 右：当前协议已有的节点，随时能再看链接 -->
++    <v-col cols="12" md="7">
++      <v-card rounded="xl" elevation="3" :title="$t('quick.existingTitle', { proto: protoName })" :subtitle="$t('quick.existingSubtitle', { proto: protoName })">
++        <v-card-text>
++          <div v-if="rows.length === 0" style="text-align: center; opacity: 0.6; padding: 28px;">
++            {{ $t('quick.empty', { proto: protoName }) }}
++          </div>
++          <v-table v-else density="compact">
++            <thead>
++              <tr>
++                <th>{{ $t('quick.colTag') }}</th>
++                <th>{{ $t('quick.colPort') }}</th>
++                <th>{{ $t('quick.colUsers') }}</th>
++                <th>{{ $t('quick.colTls') }}</th>
++                <th />
++              </tr>
++            </thead>
++            <tbody>
++              <tr v-for="r in rows" :key="r.id">
++                <td>{{ r.tag }}</td>
++                <td>{{ r.port }}</td>
++                <td>{{ r.users }}</td>
++                <td>{{ r.tls }}</td>
++                <td style="text-align: end;">
++                  <v-btn
++                    size="small"
++                    variant="text"
++                    color="primary"
++                    prepend-icon="mdi-link-variant"
++                    @click="openLinks([r.tag], r.tag)"
++                  >
++                    {{ $t('quick.links') }}
++                  </v-btn>
++                </td>
++              </tr>
++            </tbody>
++          </v-table>
++        </v-card-text>
++      </v-card>
++    </v-col>
++  </v-row>
++</template>
++
++<script lang="ts">
++import Data from '@/store/modules/data'
++import HttpUtils from '@/plugins/httputil'
++import RandomUtil from '@/plugins/randomUtil'
++import { i18n } from '@/locales'
++import { push } from 'notivue'
++import { InTypes, createInbound } from '@/types/inbounds'
++import { createClient } from '@/types/clients'
++import RelayLinks from '@/layouts/modals/RelayLinks.vue'
++import { currentHost, normalizeHost, safeName } from '@/plugins/naming'
++
++// 端口随机范围，与「入站管理」页新建入站、「中转向导」用的是同一段。
++const PORT_MIN = 10000
++const PORT_MAX = 60000
++
++// hy2 的 QUIC 只跑 h3，TLS 两侧都显式写上，省得依赖 sing-box 的默认值。
++const HY2_ALPN = ['h3']
++
++// 三种协议的差异全部收在这张表里：
++//   type   —— 入站工厂用的 InTypes 枚举
++//   cred   —— 用户凭据写在 config 的哪个键下（sing-box 都按 password 认证，
++//             name 同时是会话/统计标识，缺了流量统计会是空白）
++//   suffix —— 自签 TLS 配置名的协议后缀
++//   alpn   —— hy2 写死 h3；trojan / anytls 留空不写死
++type ProtoKey = 'hysteria2' | 'trojan' | 'anytls'
++const PROTOCOLS: Record<ProtoKey, {
++  type: string, cred: string, suffix: string, alpn?: string[]
++}> = {
++  hysteria2: { type: InTypes.Hysteria2, cred: 'hysteria2', suffix: 'hy2', alpn: HY2_ALPN },
++  trojan:    { type: InTypes.Trojan,    cred: 'trojan',    suffix: 'trojan' },
++  anytls:    { type: InTypes.AnyTls,    cred: 'anytls',    suffix: 'anytls' },
++}
++
++export default {
++  components: { RelayLinks },
++  data() {
++    return {
++      loading: false,
++      result: <any>null,
++      form: {
++        protocol: <ProtoKey>'hysteria2',
++        count: 1,          // 建几个节点
++        perNode: 1,        // 每个节点上几个用户
++        prefix: 'hy2',     // tag / 用户名的前缀
++        autoPort: true,    // true = 随机挑空闲端口；false = 从 startPort 顺序分配
++        startPort: 20000,
++        address: '',       // 写进入站 addrs，链接里就用它；留空回退到面板域名
++        sni: '',           // 自签证书的域名，同时作为客户端 SNI
++        tlsId: 0,          // 0 = 现场自签；>0 = 复用已有证书配置
++        obfs: false,       // salamander 混淆（仅 hysteria2）
++      },
++      links: {
++        visible: false,
++        tags: <string[]>[],
++        title: '',
++      },
++    }
++  },
++  watch: {
++    // 换协议时把前缀重置成对应默认值 —— 上次填的 hy2 前缀拖到 trojan 上只会困惑。
++    'form.protocol'(v: ProtoKey) {
++      this.form.prefix = v
++    },
++  },
++  computed: {
++    proto(): (typeof PROTOCOLS)[ProtoKey] {
++      return PROTOCOLS[this.form.protocol] || PROTOCOLS.hysteria2
++    },
++    protoName(): string {
++      return i18n.global.t('quick.proto' + this.form.protocol.charAt(0).toUpperCase() + this.form.protocol.slice(1))
++        || this.form.protocol
++    },
++    defaultHost(): string {
++      return currentHost()
++    },
++    // TLS 下拉：只列带服务端证书的配置（certificate / path / provider 任一），
++    // 第一条永远是「现场自签」。reality 配置在这条链路上用不了，不列。
++    tlsOptions(): { title: string, value: number }[] {
++      const opts = (Data().tlsConfigs || [])
++        .filter((t: any) => t.server?.enabled && (
++          (Array.isArray(t.server?.certificate) && t.server.certificate.length > 0) ||
++          t.server?.certificate_path ||
++          t.server?.certificate_provider
++        ))
++        .map((t: any) => ({ title: t.name, value: t.id }))
++      return [{ title: i18n.global.t('quick.tlsSelfSigned'), value: 0 }, ...opts]
++    },
++    // 当前协议的已有入站列表：按端口排序，用户数从客户端表里数出来。
++    rows(): { id: number, tag: string, port: number, users: number, tls: string }[] {
++      const clients = Data().clients || []
++      const type = this.proto.type
++      return (Data().inbounds || [])
++        .filter((i: any) => i.type === type)
++        .map((i: any) => ({
++          id: i.id,
++          tag: i.tag,
++          port: i.listen_port,
++          users: clients.filter((c: any) => Array.isArray(c.inbounds) && c.inbounds.includes(i.id)).length,
++          tls: i.tls_id > 0 ? i18n.global.t('enable') : i18n.global.t('disable'),
++        }))
++        .sort((a: any, b: any) => (a.port || 0) - (b.port || 0))
++    },
++  },
++  methods: {
++    openLinks(tags: string[], title: string) {
++      this.links.tags = tags
++      this.links.title = title
++      this.links.visible = true
++    },
++    // -----------------------------------------------------------------
++    // 端口分配。同一批里也不能重复，所以每个取完就记进集合。
++    // 随机模式最多试 300×N 次；手动模式从起始端口往上找空位。
++    // 返回的数组长度不足 count 就说明没有足够端口，调用方直接中止。
++    // -----------------------------------------------------------------
++    allocPorts(count: number): number[] {
++      const used = new Set<number>(
++        (Data().inbounds || [])
++          .map((i: any) => i.listen_port)
++          .filter((p: any) => Number.isInteger(p))
++      )
++      const ports: number[] = []
++      if (this.form.autoPort) {
++        for (let attempt = 0; attempt < 300 * count && ports.length < count; attempt++) {
++          const port = RandomUtil.randomIntRange(PORT_MIN, PORT_MAX)
++          if (used.has(port)) continue
++          used.add(port)
++          ports.push(port)
++        }
++        return ports
++      }
++      let port = Math.floor(this.form.startPort) || PORT_MIN
++      while (ports.length < count && port <= 65535) {
++        if (!used.has(port)) {
++          used.add(port)
++          ports.push(port)
++        }
++        port++
++      }
++      return ports
++    },
++    makeTagPicker(): (base: string) => string {
++      const used = new Set<string>([
++        ...(Data().outbounds || []).map((o: any) => o.tag),
++        ...(Data().endpoints || []).map((e: any) => e.tag),
++        ...(Data().inbounds || []).map((i: any) => i.tag),
++      ])
++      return (base: string) => {
++        let tag = base
++        let n = 1
++        while (used.has(tag)) tag = base + '-' + (n++)
++        used.add(tag)
++        return tag
++      }
++    },
++    // -----------------------------------------------------------------
++    // TLS：选了已有配置就复用；否则现场签一张自签证书。
++    // 一批节点共用同一份证书 —— 域名一样，签 N 份只会在 TLS 列表里堆垃圾。
++    // 自签的客户端侧带 insecure: true，后端 LinkGenerator 会写成 insecure=1。
++    // alpn 只给 hysteria2 写 h3（QUIC 只跑 h3）；trojan / anytls 留空，
++    // 不写死免得跟客户端对不上。
++    // -----------------------------------------------------------------
++    async ensureTls(prefix: string): Promise<number> {
++      if (this.form.tlsId > 0) return this.form.tlsId
++
++      const sni = normalizeHost(this.form.sni) || currentHost() || 'www.bing.com'
++      const msg = await HttpUtils.get<string[]>('api/keypairs', { k: 'tls', o: sni })
++      if (!msg.success || !Array.isArray(msg.obj) || msg.obj.length == 0) {
++        push.error({ message: i18n.global.t('quick.noTls') })
++        return 0
++      }
++      // 后端一次性给出「私钥 PEM + 证书 PEM」，按 BEGIN/END 标记切开。
++      const key: string[] = []
++      const cert: string[] = []
++      let mode = ''
++      msg.obj.forEach((line: string) => {
++        if (line === '-----BEGIN PRIVATE KEY-----') { mode = 'key'; key.push(line) }
++        else if (line === '-----END PRIVATE KEY-----') { key.push(line); mode = '' }
++        else if (line === '-----BEGIN CERTIFICATE-----') { mode = 'cert'; cert.push(line) }
++        else if (line === '-----END CERTIFICATE-----') { cert.push(line); mode = '' }
++        else if (mode === 'key') key.push(line)
++        else if (mode === 'cert') cert.push(line)
++      })
++      if (key.length == 0 || cert.length == 0) {
++        push.error({ message: i18n.global.t('quick.noTls') })
++        return 0
++      }
++
++      const tlsName = prefix + '-' + this.proto.suffix + '-' + RandomUtil.randomLowerAndNum(4)
++      const tls: any = {
++        id: 0,
++        name: tlsName,
++        server: {
++          enabled: true,
++          server_name: sni,
++          certificate: cert,
++          key: key,
++        },
++        client: {
++          // 自签证书只能靠 insecure 过，链接里会带 insecure=1
++          insecure: true,
++        },
++      }
++      if (this.proto.alpn) {
++        tls.server.alpn = this.proto.alpn
++        tls.client.alpn = this.proto.alpn
++      }
++      if (!await Data().save('tls', 'new', tls)) return 0
++      const saved = (Data().tlsConfigs || []).find((t: any) => t.name == tlsName)
++      if (!saved?.id) {
++        push.error({ message: i18n.global.t('quick.noTls') })
++        return 0
++      }
++      return saved.id
++    },
++    // -----------------------------------------------------------------
++    // 一键创建：端口 → TLS → 逐个入站 → 每个入站的用户（addbulk）。
++    // 用户凭据写在 config.<cred> = {name, password}：三种协议都按密码认证，
++    // name 同时是 sing-box 侧的会话/统计标识，缺了流量统计会是空白。
++    // -----------------------------------------------------------------
++    async create() {
++      const count = Math.min(Math.max(Math.floor(this.form.count) || 1, 1), 50)
++      const perNode = Math.min(Math.max(Math.floor(this.form.perNode) || 1, 1), 50)
++      const protoKey: ProtoKey = this.form.protocol
++      const proto = this.proto
++      const prefix = safeName(this.form.prefix) || protoKey
++
++      const ports = this.allocPorts(count)
++      if (ports.length < count) {
++        push.error({ message: i18n.global.t('quick.noPort') })
++        return
++      }
++
++      this.loading = true
++      this.result = null
++      try {
++        const tlsId = await this.ensureTls(prefix)
++        if (!tlsId) return
++
++        const pickTag = this.makeTagPicker()
++        const addr = normalizeHost(this.form.address)
++        const takenNames = new Set<string>((Data().clients || []).map((c: any) => c.name))
++        const tags: string[] = []
++        const failed: string[] = []
++        let users = 0
++
++        for (let i = 0; i < count; i++) {
++          const base = count == 1 ? prefix : prefix + '-' + (i + 1)
++          const tag = pickTag(base)
++          const port = ports[i]
++
++          // 1) 入站。addrs / out_json 是「入站管理」页新建时也会带的字段，
++          //    缺了它们客户端链接就拼不出来。anytls 工厂自带 padding_scheme。
++          const inbound: any = createInbound(proto.type, {
++            id: 0, tag, listen: '::', listen_port: port, tls_id: tlsId,
++          })
++          if (protoKey === 'hysteria2' && this.form.obfs) {
++            // 每个入站一把混淆密码，链接里会带 obfs=salamander&obfs-password=...
++            inbound.obfs = { type: 'salamander', password: RandomUtil.randomSeq(16) }
++          }
++          inbound.addrs = addr ? [{ server: addr, server_port: port, remark: '' }] : []
++          inbound.out_json = {}
++          if (!await Data().save('inbounds', 'new', inbound)) {
++            failed.push(base)
++            continue
++          }
++          const savedInbound = (Data().inbounds || []).find((x: any) => x.tag == tag)
++          if (!savedInbound?.id) {
++            failed.push(base)
++            continue
++          }
++
++          // 2) 用户。名字重复就加序号，不然 addbulk 会因重名整批失败。
++          const clients: any[] = []
++          for (let u = 0; u < perNode; u++) {
++            let userName = perNode == 1 ? base : base + '-' + (u + 1)
++            let seq = 1
++            while (takenNames.has(userName)) userName = (perNode == 1 ? base : base + '-' + (u + 1)) + '-' + (seq++)
++            takenNames.add(userName)
++
++            const client: any = createClient({ name: userName, inbounds: [savedInbound.id] })
++            const cfg = client.config || {}
++            cfg[proto.cred] = { name: userName, password: RandomUtil.randomSeq(16) }
++            client.config = cfg
++            clients.push(client)
++          }
++          // addbulk：一个节点的用户整批一次提交，别一个个存。
++          if (!await Data().save('clients', 'addbulk', clients)) {
++            failed.push(base)
++            continue
++          }
++
++          users += clients.length
++          tags.push(tag)
++        }
++
++        if (tags.length === 0) {
++          this.result = { ok: false, text: i18n.global.t('quick.fail', { list: failed.join(', ') }) }
++          push.error({ message: this.result.text })
++          return
++        }
++
++        const done = i18n.global.t('quick.created', { n: tags.length, users, proto: this.protoName })
++        this.result = failed.length == 0
++          ? { ok: true, text: done }
++          : { ok: false, text: done + ' / ' + i18n.global.t('quick.fail', { list: failed.join(', ') }) }
++        push.success({ title: i18n.global.t('success'), message: done })
++
++        // 3) 建完直接把链接摊出来（复制 / 二维码 / Base64 整包）。
++        this.openLinks(tags, prefix)
++      } catch (e: any) {
++        push.error({ message: i18n.global.t('error.invalidData') + ': ' + (e?.toString() ?? '') })
++      } finally {
++        this.loading = false
++      }
++    },
++  },
++}
++</script>
+diff -ruN
+--- a/src/views/Relay.vue	1970-01-01 08:00:00.000000000 +0800
 +++ b/src/views/Relay.vue	2026-10-29 13:38:06.163954000 +0800
 @@ -0,0 +1,457 @@
 +<template>
@@ -5791,7 +5857,7 @@ diff -ruN
 +}
 +</script>
 diff -ruN
---- C:\Users\Administrator\WorkBuddy\2026-10-04-10-51-07\suiwork\x\s-ui-frontend-1.6.5/src/views/Servers.vue	1970-01-01 08:00:00.000000000 +0800
+--- a/src/views/Servers.vue	1970-01-01 08:00:00.000000000 +0800
 +++ b/src/views/Servers.vue	2026-10-23 21:48:03.246574000 +0800
 @@ -0,0 +1,337 @@
 +<template>
@@ -6132,7 +6198,7 @@ diff -ruN
 +}
 +</script>
 diff -ruN
---- C:\Users\Administrator\WorkBuddy\2026-10-04-10-51-07\suiwork\x\s-ui-frontend-1.6.5/src/views/Settings.vue	2026-10-15 18:53:46.000000000 +0800
+--- a/src/views/Settings.vue	2026-10-15 18:53:46.000000000 +0800
 +++ b/src/views/Settings.vue	2026-10-23 21:48:03.247570700 +0800
 @@ -46,6 +46,23 @@
              {{ $t('actions.restartApp') }}
